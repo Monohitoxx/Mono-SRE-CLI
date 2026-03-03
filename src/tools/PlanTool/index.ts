@@ -72,8 +72,8 @@ The plan MUST include:
   }
 
   async execute(args: Record<string, unknown>): Promise<ToolResult> {
-    const title = args.title as string;
-    const steps = args.steps as PlanStep[];
+    const title = safeString(args.title, "Untitled Plan");
+    const steps = safeSteps(args.steps);
 
     const formatted = [
       `Plan approved: ${title}`,
@@ -90,8 +90,12 @@ The plan MUST include:
 }
 
 export function formatPlanForDisplay(args: Record<string, unknown>): string {
-  const title = args.title as string;
-  const steps = (args.steps as PlanStep[]) || [];
+  const title = safeString(args.title, "Untitled Plan");
+  const steps = safeSteps(args.steps);
+
+  if (steps.length === 0) {
+    return `Plan: ${title}\n\n  (no steps provided)`;
+  }
 
   const lines = [`Plan: ${title}`, ""];
   for (const step of steps) {
@@ -101,4 +105,20 @@ export function formatPlanForDisplay(args: Record<string, unknown>): string {
     }
   }
   return lines.join("\n");
+}
+
+function safeString(val: unknown, fallback: string): string {
+  if (typeof val === "string" && val.trim()) return val;
+  return fallback;
+}
+
+function safeSteps(val: unknown): PlanStep[] {
+  if (!Array.isArray(val)) return [];
+  return val
+    .filter((s): s is Record<string, unknown> => s && typeof s === "object")
+    .map((s, i) => ({
+      id: typeof s.id === "number" ? s.id : i + 1,
+      title: safeString(s.title, `Step ${i + 1}`),
+      description: typeof s.description === "string" ? s.description : "",
+    }));
 }

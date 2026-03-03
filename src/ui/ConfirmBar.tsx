@@ -2,7 +2,6 @@ import React from "react";
 import { Box, Text, useInput } from "ink";
 import type { ToolCall } from "../core/types.js";
 import { detectSudo } from "../tools/SSHTool/exec.js";
-import type { PlanStep } from "../tools/PlanTool/index.js";
 
 interface ConfirmBarProps {
   toolCall: ToolCall;
@@ -51,8 +50,18 @@ function PlanConfirmBar({
     }
   });
 
-  const title = toolCall.arguments.title as string;
-  const steps = (toolCall.arguments.steps as PlanStep[]) || [];
+  const title =
+    typeof toolCall.arguments.title === "string" && toolCall.arguments.title
+      ? toolCall.arguments.title
+      : "Untitled Plan";
+  const rawSteps = Array.isArray(toolCall.arguments.steps)
+    ? toolCall.arguments.steps
+    : [];
+  const steps = rawSteps.map((s: Record<string, unknown>, i: number) => ({
+    id: typeof s?.id === "number" ? s.id : i + 1,
+    title: typeof s?.title === "string" ? s.title : `Step ${i + 1}`,
+    description: typeof s?.description === "string" ? s.description : "",
+  }));
 
   return (
     <Box
@@ -65,6 +74,9 @@ function PlanConfirmBar({
         {">>> "}Plan: {title}
       </Text>
       <Text> </Text>
+      {steps.length === 0 && (
+        <Text color="yellow">  (no steps provided)</Text>
+      )}
       {steps.map((step) => (
         <Box key={step.id} flexDirection="column" marginLeft={1}>
           <Text>

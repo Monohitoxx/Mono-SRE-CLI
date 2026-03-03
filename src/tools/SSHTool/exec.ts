@@ -80,7 +80,8 @@ export class SSHExecTool extends BaseTool {
   }
 }
 
-export function detectSudo(command: string): boolean {
+export function detectSudo(command: string | undefined | null): boolean {
+  if (!command) return false;
   const trimmed = command.trim();
   if (trimmed.startsWith("sudo ")) return true;
   if (/echo\s+.*\|\s*sudo\s/.test(trimmed)) return true;

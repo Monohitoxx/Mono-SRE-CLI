@@ -88,7 +88,20 @@ export class Agent {
       }
 
       for (const toolCall of pendingToolCalls) {
-        // ─── POLICY: Risk classification gate ────────────────────────
+        // ─── GATE 1: Argument validation (before any UI) ────────────
+        const validationError = this.toolRegistry.validateToolCall(toolCall);
+        if (validationError) {
+          callbacks.onToolCallStart(toolCall);
+          this.conversation.addToolResult(
+            toolCall.id,
+            validationError.content,
+            true,
+          );
+          callbacks.onToolCallEnd(toolCall, validationError.content, true);
+          continue;
+        }
+
+        // ─── GATE 2: Risk classification — plan required? ───────────
         const risk = classifyToolCallRisk(
           toolCall.name,
           toolCall.arguments,
@@ -110,7 +123,7 @@ export class Agent {
           continue;
         }
 
-        // ─── Normal confirmation flow ────────────────────────────────
+        // ─── GATE 3: User confirmation ──────────────────────────────
         const needsConfirm = this.toolRegistry.needsConfirmation(toolCall.name);
 
         callbacks.onToolCallStart(toolCall);
@@ -129,6 +142,7 @@ export class Agent {
           }
         }
 
+        // ─── Execute ────────────────────────────────────────────────
         const result = await this.toolRegistry.execute(toolCall);
         this.conversation.addToolResult(
           toolCall.id,

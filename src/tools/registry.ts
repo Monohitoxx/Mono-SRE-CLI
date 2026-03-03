@@ -22,6 +22,27 @@ export class ToolRegistry {
     return Array.from(this.tools.values()).map((t) => t.getDefinition());
   }
 
+  /**
+   * Pre-flight argument validation — called BEFORE confirmation UI.
+   * Returns null if valid, or a ToolResult error if args are missing.
+   */
+  validateToolCall(toolCall: ToolCall): ToolResult | null {
+    const tool = this.tools.get(toolCall.name);
+    if (!tool) {
+      return {
+        toolCallId: toolCall.id,
+        content: `Unknown tool: ${toolCall.name}`,
+        isError: true,
+      };
+    }
+    const error = tool.validateArgs(toolCall.arguments);
+    if (error) {
+      error.toolCallId = toolCall.id;
+      return error;
+    }
+    return null;
+  }
+
   async execute(toolCall: ToolCall): Promise<ToolResult> {
     const tool = this.tools.get(toolCall.name);
     if (!tool) {
