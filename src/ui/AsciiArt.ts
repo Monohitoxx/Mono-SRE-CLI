@@ -1,0 +1,39 @@
+export const REASON_LOGO_LARGE = `
+  █████████  ███████████   ██████████
+ ███░░░░░███░░███░░░░░███ ░░███░░░░░█
+░███    ░░░  ░███    ░███  ░███  █ ░ 
+░░█████████  ░██████████   ░██████   
+ ░░░░░░░░███ ░███░░░░░███  ░███░░█   
+ ███    ░███ ░███    ░███  ░███ ░   █
+░░█████████  █████   █████ ██████████
+ ░░░░░░░░░  ░░░░░   ░░░░░ ░░░░░░░░░░
+`;
+
+export const REASON_LOGO_MEDIUM = `
+ ██████  ██████  ██████
+ ██      ██  ██  ██    
+ ██████  ██████  ████  
+     ██  ██  ██  ██    
+ ██████  ██  ██  ██████
+`;
+
+export const REASON_LOGO_SMALL = `
+ ██████
+ ██    
+ ████  
+ ██    
+ ██████
+`;
+
+export function getAsciiArtWidth(art: string): number {
+  return Math.max(...art.split("\n").map((line) => line.length));
+}
+
+export function pickLogo(terminalWidth: number): string {
+  const largWidth = getAsciiArtWidth(REASON_LOGO_LARGE);
+  const medWidth = getAsciiArtWidth(REASON_LOGO_MEDIUM);
+
+  if (terminalWidth >= largWidth + 4) return REASON_LOGO_LARGE;
+  if (terminalWidth >= medWidth + 4) return REASON_LOGO_MEDIUM;
+  return REASON_LOGO_SMALL;
+}

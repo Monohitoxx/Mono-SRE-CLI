@@ -1,0 +1,32 @@
+{
+  "commands": {
+    "allow": [
+      "ls", "cat", "grep", "find", "df", "du", "ps", "top", "free",
+      "uname", "whoami", "hostname", "uptime", "date",
+      "kubectl", "docker", "systemctl", "journalctl",
+      "curl", "wget", "ping", "traceroute", "dig", "nslookup",
+      "netstat", "ss", "ip", "ifconfig",
+      "tail", "head", "less", "wc", "sort", "awk", "sed",
+      "apt", "yum", "dnf", "apk",
+      "useradd", "usermod", "passwd",
+      "chmod", "chown",
+      "ufw", "iptables",
+      "cp", "mv", "mkdir"
+    ],
+    "deny": [
+      "rm -rf /",
+      "shutdown",
+      "reboot",
+      "mkfs",
+      "dd if=",
+      "> /dev/sda",
+      "chmod -R 777 /",
+      ":(){ :|:& };:"
+    ]
+  },
+  "ssh": {
+    "default_user": "root",
+    "known_hosts": "~/.ssh/known_hosts",
+    "timeout": 30000
+  }
+}
