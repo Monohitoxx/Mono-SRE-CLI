@@ -1,5 +1,6 @@
-import React from "react";
+import React, { useEffect, useState } from "react";
 import { Box, Text } from "ink";
+import { Spinner } from "./Spinner.js";
 
 interface StatusBarProps {
   provider: string;
@@ -7,13 +8,32 @@ interface StatusBarProps {
   isLoading: boolean;
   sshConnected?: string;
   rootMode?: boolean;
+  elapsedMs: number;
+  tokens: number;
 }
 
-export function StatusBar({ provider, model, isLoading, sshConnected, rootMode }: StatusBarProps) {
+const ACTIVITY_FRAMES = [
+  "▁▂▃▄▅▆▅▄▃▂",
+  "▂▃▄▅▆▇▆▅▄▃",
+  "▃▄▅▆▇█▇▆▅▄",
+  "▄▅▆▇█▇▆▅▄▃",
+];
+
+export function StatusBar({ provider, model, isLoading, sshConnected, rootMode, elapsedMs, tokens }: StatusBarProps) {
+  const [frame, setFrame] = useState(0);
+
+  useEffect(() => {
+    if (!isLoading) return;
+    const timer = setInterval(() => {
+      setFrame((prev) => (prev + 1) % ACTIVITY_FRAMES.length);
+    }, 300);
+    return () => clearInterval(timer);
+  }, [isLoading]);
+
   return (
     <Box
-      borderStyle="single"
-      borderColor={rootMode ? "red" : "gray"}
+      borderStyle="round"
+      borderColor={rootMode ? "red" : isLoading ? "yellow" : "gray"}
       paddingX={1}
       justifyContent="space-between"
     >
@@ -32,9 +52,14 @@ export function StatusBar({ provider, model, isLoading, sshConnected, rootMode }
       </Box>
       <Box gap={2}>
         {sshConnected && (
-          <Text color="green">SSH: {sshConnected}</Text>
+          <Text color="green">SSH {sshConnected}</Text>
         )}
-        {isLoading && <Text color="yellow">thinking...</Text>}
+        {isLoading && (
+          <Text color="yellow" dimColor>
+            {ACTIVITY_FRAMES[frame]}
+          </Text>
+        )}
+        {isLoading && <Spinner label="thinking" elapsedMs={elapsedMs} tokens={tokens} />}
       </Box>
     </Box>
   );

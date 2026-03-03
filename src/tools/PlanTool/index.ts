@@ -32,7 +32,9 @@ Do NOT use this tool for:
 The plan MUST include:
 1. Pre-flight checks (network, resources, OS, existing services)
 2. Clear execution steps in order
-3. A verification step at the end to confirm success`;
+3. A verification step at the end to confirm success
+
+IMPORTANT: Do NOT include 'sudo' in plan step descriptions. The system handles privilege escalation automatically — write commands without sudo (e.g. 'docker stop X', not 'sudo docker stop X').`;
 
   parameters = {
     type: "object",
@@ -80,6 +82,22 @@ The plan MUST include:
       `${steps.length} steps to execute.`,
       "",
       ...steps.map((s) => `  ${s.id}. ${s.title}`),
+      "",
+      "INSTRUCTIONS — follow these strictly:",
+      "1. Start with a brief message to the user (e.g. 'Starting nginx installation on test_ubuntu...').",
+      "2. Execute ALL steps NOW in sequence. Do NOT stop to wait for user input between steps.",
+      "3. Each response must follow this pattern:",
+      "   a) A brief status message (1 sentence) telling the user what you're doing",
+      "   b) think (reason about what you are about to do)",
+      "   c) plan_progress(action='start', step=N) — only when starting a new step",
+      "   d) exactly ONE action tool call (execute_command, service_control, etc.)",
+      "   Wait for the result, then in your next response: brief status + think + next action or plan_progress(action='done', step=N).",
+      "4. NEVER call more than ONE action tool per response. If a step needs multiple commands, use separate responses with a think before each.",
+      "5. Only do what the step describes. Do NOT add extra commands (e.g. don't run 'apt update' when the step says 'Remove package').",
+      "6. Every response MUST include tool calls — never send text-only while steps remain.",
+      "7. Continue until ALL steps are completed. End with a summary of what was done.",
+      "8. Do NOT add sudo to commands — even if a command output suggests it. The system handles sudo escalation automatically.",
+      "9. Do NOT chain commands with && or ; — run each command in a separate tool call. Pipes (|) for filtering are OK.",
     ].join("\n");
 
     return {

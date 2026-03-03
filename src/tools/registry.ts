@@ -1,8 +1,6 @@
 import type { BaseTool, PrivilegeLevel } from "./base.js";
 import type { ToolDefinition, ToolResult, ToolCall } from "../core/types.js";
 import { ShellTool } from "./ShellTool/index.js";
-import { FileReadTool } from "./FileReadTool/index.js";
-import { FileWriteTool } from "./FileWriteTool/index.js";
 import { ThinkTool } from "./ThinkTool/index.js";
 import { PlanTool } from "./PlanTool/index.js";
 
@@ -82,20 +80,18 @@ export class ToolRegistry {
 }
 
 export function createDefaultRegistry(
-  commandValidator?: (cmd: string) => boolean,
+  commandChecker?: (cmd: string) => string | null,
 ): ToolRegistry {
   const registry = new ToolRegistry();
 
   const shellTool = new ShellTool();
-  if (commandValidator) {
-    shellTool.setCommandValidator(commandValidator);
+  if (commandChecker) {
+    shellTool.setCommandChecker(commandChecker);
   }
 
   registry.register(new ThinkTool());
   registry.register(new PlanTool());
   registry.register(shellTool);
-  registry.register(new FileReadTool());
-  registry.register(new FileWriteTool());
 
   return registry;
 }

@@ -2,10 +2,11 @@ import type { Message } from "./types.js";
 
 export class Conversation {
   private messages: Message[] = [];
-  private systemPrompt: string;
+  private getSystemPrompt: () => string;
 
-  constructor(systemPrompt: string) {
-    this.systemPrompt = systemPrompt;
+  constructor(systemPrompt: string | (() => string)) {
+    this.getSystemPrompt =
+      typeof systemPrompt === "function" ? systemPrompt : () => systemPrompt;
   }
 
   addUser(content: string) {
@@ -26,7 +27,7 @@ export class Conversation {
 
   getMessages(): Message[] {
     return [
-      { role: "system", content: this.systemPrompt },
+      { role: "system", content: this.getSystemPrompt() },
       ...this.messages,
     ];
   }

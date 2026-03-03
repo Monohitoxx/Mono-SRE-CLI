@@ -16,5 +16,5 @@ export interface Command {
   aliases?: string[];
   description: string;
   isEnabled: boolean;
-  execute: (ctx: CommandContext) => CommandResult;
+  execute: (ctx: CommandContext, args: string) => CommandResult;
 }

@@ -53,11 +53,17 @@ export interface ToolDefinition {
   parameters: Record<string, unknown>;
 }
 
+export interface TokenUsage {
+  inputTokens: number;
+  outputTokens: number;
+}
+
 export type StreamEvent =
   | { type: "text_delta"; text: string }
   | { type: "tool_call_start"; toolCall: ToolCall }
   | { type: "tool_call_delta"; toolCallId: string; arguments: string }
   | { type: "tool_call_end"; toolCall: ToolCall }
+  | { type: "usage"; usage: TokenUsage }
   | { type: "done"; message: Message }
   | { type: "error"; error: string };
 

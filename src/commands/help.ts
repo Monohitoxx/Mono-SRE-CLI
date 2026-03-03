@@ -10,6 +10,7 @@ export const help: Command = {
       "Commands:",
       "  /clear  - Clear conversation",
       "  /root   - Toggle root mode (enable sudo)",
+      "  /init   - Manage machine inventory (add/list/remove)",
       "  /exit   - Exit SRE AI",
       "  /help   - Show this help",
       "",

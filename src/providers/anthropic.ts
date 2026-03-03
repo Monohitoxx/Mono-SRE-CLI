@@ -50,6 +50,7 @@ export class AnthropicProvider implements AIProvider {
 
     let fullText = "";
     const toolCalls: ToolCall[] = [];
+    let lastOutputTokens = 0;
     let currentToolUse: {
       id: string;
       name: string;
@@ -57,7 +58,30 @@ export class AnthropicProvider implements AIProvider {
     } | null = null;
 
     for await (const event of stream) {
-      if (
+      if (event.type === "message_start" && event.message?.usage) {
+        yield {
+          type: "usage",
+          usage: {
+            inputTokens: event.message.usage.input_tokens ?? 0,
+            outputTokens: 0,
+          },
+        };
+      } else if (
+        event.type === "message_delta" &&
+        (event as unknown as Record<string, unknown>).usage
+      ) {
+        const u = (event as unknown as Record<string, { output_tokens?: number }>).usage;
+        const cumulative = u.output_tokens ?? 0;
+        const delta = Math.max(0, cumulative - lastOutputTokens);
+        lastOutputTokens = cumulative;
+        yield {
+          type: "usage",
+          usage: {
+            inputTokens: 0,
+            outputTokens: delta,
+          },
+        };
+      } else if (
         event.type === "content_block_start" &&
         event.content_block.type === "text"
       ) {

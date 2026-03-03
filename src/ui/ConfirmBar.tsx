@@ -1,7 +1,7 @@
 import React from "react";
 import { Box, Text, useInput } from "ink";
 import type { ToolCall } from "../core/types.js";
-import { detectSudo } from "../tools/SSHTool/exec.js";
+import { detectSudo } from "../tools/RemoteTools/index.js";
 
 interface ConfirmBarProps {
   toolCall: ToolCall;
@@ -10,26 +10,52 @@ interface ConfirmBarProps {
   onConfirm: (approved: boolean) => void;
 }
 
+function formatTarget(args: Record<string, unknown>): string {
+  if (args.tags && Array.isArray(args.tags)) {
+    return `[tags: ${(args.tags as string[]).join(", ")}]`;
+  }
+  if (args.hosts && Array.isArray(args.hosts)) {
+    return (args.hosts as string[]).join(", ");
+  }
+  return (args.host as string) || "?";
+}
+
 function describeToolCall(toolCall: ToolCall): string {
   const { name, arguments: args } = toolCall;
   const command = args.command as string | undefined;
   const hasSudo = command ? detectSudo(command) : false;
 
   switch (name) {
-    case "ssh_connect": {
-      const authMethod = args.password ? "password" : "key";
-      return `SSH connect to ${args.username}@${args.host}${args.port ? `:${args.port}` : ""} (${authMethod} auth)`;
-    }
-    case "ssh_exec":
-      return hasSudo
-        ? `Run on remote as ROOT: ${command}`
-        : `Run on remote: ${command}`;
-    case "ssh_disconnect":
-      return `Disconnect SSH: ${args.connectionId}`;
     case "shell":
       return hasSudo
         ? `Run locally as ROOT: ${command}`
         : `Run locally: ${command}`;
+
+    case "execute_command": {
+      const target = formatTarget(args);
+      const fullCmd = args.args ? `${command} ${args.args}` : command;
+      return hasSudo
+        ? `Run on ${target} as ROOT: ${fullCmd}`
+        : `Run on ${target}: ${fullCmd}`;
+    }
+
+    case "service_control": {
+      const target = formatTarget(args);
+      const action = args.action as string;
+      const service = args.service as string;
+      const isWrite = action !== "status";
+      const prefix = isWrite ? "[SUDO] " : "";
+      return `${prefix}systemctl ${action} ${service} on ${target}`;
+    }
+
+    case "write_config": {
+      const target = formatTarget(args);
+      const configPath = args.config_path as string;
+      const contentLen = typeof args.content === "string" ? args.content.length : 0;
+      const backup = args.backup !== false ? " (backup: yes)" : "";
+      return `[SUDO] Write ${contentLen} bytes to ${configPath} on ${target}${backup}`;
+    }
+
     default:
       return `${name}(${JSON.stringify(args)})`;
   }
@@ -110,16 +136,12 @@ function PlanConfirmBar({
   );
 }
 
-export function ConfirmBar({
+function ToolConfirmBar({
   toolCall,
   isRoot,
   needsRootEscalation,
   onConfirm,
 }: ConfirmBarProps) {
-  if (toolCall.name === "plan") {
-    return <PlanConfirmBar toolCall={toolCall} onConfirm={onConfirm} />;
-  }
-
   useInput((input, key) => {
     if (input === "y" || input === "Y" || key.return) {
       onConfirm(true);
@@ -165,4 +187,11 @@ export function ConfirmBar({
       </Box>
     </Box>
   );
+}
+
+export function ConfirmBar(props: ConfirmBarProps) {
+  if (props.toolCall.name === "plan") {
+    return <PlanConfirmBar toolCall={props.toolCall} onConfirm={props.onConfirm} />;
+  }
+  return <ToolConfirmBar {...props} />;
 }

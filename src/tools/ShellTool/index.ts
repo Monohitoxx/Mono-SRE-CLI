@@ -22,15 +22,15 @@ export class ShellTool extends BaseTool {
     required: ["command"],
   };
 
-  private commandValidator?: (cmd: string) => boolean;
+  private commandChecker?: (cmd: string) => string | null;
 
   constructor() {
     super();
     this.requiresConfirmation = true;
   }
 
-  setCommandValidator(validator: (cmd: string) => boolean) {
-    this.commandValidator = validator;
+  setCommandChecker(checker: (cmd: string) => string | null) {
+    this.commandChecker = checker;
   }
 
   async execute(args: Record<string, unknown>): Promise<ToolResult> {
@@ -41,12 +41,15 @@ export class ShellTool extends BaseTool {
       this.privilege = "root";
     }
 
-    if (this.commandValidator && !this.commandValidator(command)) {
-      return {
-        toolCallId: "",
-        content: `Command denied by policy: ${command}`,
-        isError: true,
-      };
+    if (this.commandChecker) {
+      const denyReason = this.commandChecker(command);
+      if (denyReason) {
+        return {
+          toolCallId: "",
+          content: `Command denied by policy: ${command}\nReason: ${denyReason}`,
+          isError: true,
+        };
+      }
     }
 
     return new Promise((resolve) => {

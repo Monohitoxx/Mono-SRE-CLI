@@ -5,7 +5,7 @@ const SRE_TIPS = [
   "Use /help to see all available commands",
   "Create SKILL.md files in .reason/skills/ to add custom workflows",
   "Configure allowed commands in .reason/settings.json",
-  "SSH into remote servers: just ask me to connect to a host",
+  "Run remote operations by targeting host, hosts, or tags from inventory",
   "Use /clear to start a fresh conversation",
   "Change AI models by editing .reason/.env (PROVIDER & MODEL)",
   "I can run kubectl, docker, and systemctl commands for you",
@@ -16,7 +16,7 @@ const SRE_TIPS = [
   "Ask me to analyze logs for errors and patterns",
   "I can help debug Kubernetes pods, deployments, and services",
   "For security, I always confirm before running destructive commands",
-  "Pipe complex workflows by chaining SSH commands across servers",
+  "Use inventory_lookup before operating on remote machines",
 ];
 
 export function Tips() {

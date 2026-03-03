@@ -129,10 +129,10 @@ const READ_ONLY_PATTERNS: RegExp[] = [
 const EXEMPT_TOOLS = new Set([
   "think",
   "plan",
-  "read_file",
-  "write_file",
-  "ssh_connect",
-  "ssh_disconnect",
+  "plan_progress",
+  "inventory_lookup",
+  "read_config",
+  "run_healthcheck",
 ]);
 
 // ─── Public API ───────────────────────────────────────────────────────────
@@ -145,6 +145,29 @@ export function classifyToolCallRisk(
     return { level: "read-only", reason: "exempt tool", matchedPatterns: [] };
   }
 
+  // ─── service_control: classify by action ─────────────────────────────
+  if (toolName === "service_control") {
+    const action = typeof args.action === "string" ? args.action : "";
+    if (action === "status") {
+      return { level: "read-only", reason: "service status check", matchedPatterns: [] };
+    }
+    return {
+      level: "plan-required",
+      reason: `service lifecycle: ${action}`,
+      matchedPatterns: ["service-lifecycle"],
+    };
+  }
+
+  // ─── write_config: always plan-required ──────────────────────────────
+  if (toolName === "write_config") {
+    return {
+      level: "plan-required",
+      reason: "configuration file modification",
+      matchedPatterns: ["config-write"],
+    };
+  }
+
+  // ─── execute_command: classify by command content ────────────────────
   const command =
     typeof args.command === "string" ? args.command.trim() : null;
 
@@ -152,18 +175,9 @@ export function classifyToolCallRisk(
     return { level: "low", reason: "no command argument", matchedPatterns: [] };
   }
 
-  // Check read-only first — if it matches, it's safe
-  for (const pattern of READ_ONLY_PATTERNS) {
-    if (pattern.test(command)) {
-      return {
-        level: "read-only",
-        reason: "read-only operation",
-        matchedPatterns: [pattern.source],
-      };
-    }
-  }
-
-  // Check plan-required patterns
+  // Check plan-required patterns first.
+  // For compound commands (e.g. "docker stop ... && docker ps"),
+  // any mutating segment should force plan mode.
   const matched: string[] = [];
   for (const group of PLAN_REQUIRED_GROUPS) {
     for (const pattern of group.patterns) {
@@ -180,6 +194,17 @@ export function classifyToolCallRisk(
       reason: `modifying operation: ${matched.join(", ")}`,
       matchedPatterns: matched,
     };
+  }
+
+  // Check read-only after plan-required matching.
+  for (const pattern of READ_ONLY_PATTERNS) {
+    if (pattern.test(command)) {
+      return {
+        level: "read-only",
+        reason: "read-only operation",
+        matchedPatterns: [pattern.source],
+      };
+    }
   }
 
   // Commands with sudo that didn't match read-only → treat as plan-required

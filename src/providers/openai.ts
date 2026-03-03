@@ -45,6 +45,7 @@ export class OpenAIProvider implements AIProvider {
       messages: openaiMessages,
       tools: openaiTools?.length ? openaiTools : undefined,
       stream: true,
+      stream_options: { include_usage: true },
     });
 
     const toolCalls = new Map<
@@ -54,6 +55,16 @@ export class OpenAIProvider implements AIProvider {
     let fullText = "";
 
     for await (const chunk of stream) {
+      if (chunk.usage) {
+        yield {
+          type: "usage",
+          usage: {
+            inputTokens: chunk.usage.prompt_tokens ?? 0,
+            outputTokens: chunk.usage.completion_tokens ?? 0,
+          },
+        };
+      }
+
       const delta = chunk.choices[0]?.delta;
       if (!delta) continue;
 

@@ -1,4 +1,5 @@
 import { Client, type ConnectConfig } from "ssh2";
+import type { AuditLogger } from "./audit.js";
 
 export interface SSHConnection {
   id: string;
@@ -9,12 +10,36 @@ export interface SSHConnection {
   connectedAt: Date;
 }
 
+export type SudoGuard = (connectionId: string, command: string) => Promise<boolean>;
+
+const SUDO_TOKEN_RE = /(^|[\s;&|()])sudo(?=\s|$)/;
+
 export class SSHManager {
   private connections = new Map<string, SSHConnection>();
   private timeoutMs = 30000;
+  private sudoGuard?: SudoGuard;
+  private sudoGuardBypassed = false;
+  private audit?: AuditLogger;
+
+  setAuditLogger(audit: AuditLogger) {
+    this.audit = audit;
+  }
 
   setTimeout(ms: number) {
     this.timeoutMs = ms;
+  }
+
+  setSudoGuard(guard: SudoGuard | undefined) {
+    this.sudoGuard = guard;
+  }
+
+  /** Skip sudo guard prompts until clearSudoBypass() is called. */
+  bypassSudoGuard() {
+    this.sudoGuardBypassed = true;
+  }
+
+  clearSudoBypass() {
+    this.sudoGuardBypassed = false;
   }
 
   async connect(opts: {
@@ -77,6 +102,7 @@ export class SSHManager {
             client,
             connectedAt: new Date(),
           });
+          this.audit?.log("ssh_connect", { connectionId: id, host: opts.host, username: opts.username });
           resolve(id);
         })
         .on("error", (err) => {
@@ -92,6 +118,19 @@ export class SSHManager {
       throw new Error(`No active SSH connection: ${connectionId}`);
     }
 
+    // Sudo guard: intercept NOPASSWD sudo commands (skip if Layer 2 already approved)
+    if (SUDO_TOKEN_RE.test(command)) {
+      const cleanCmd = command.replace(SUDO_TOKEN_RE, "$1").trim();
+      if (this.sudoGuardBypassed) {
+        this.audit?.log("sudo_bypassed", { connectionId, command: cleanCmd, reason: "layer2_approved" });
+      } else if (this.sudoGuard) {
+        const approved = await this.sudoGuard(connectionId, cleanCmd);
+        if (!approved) {
+          throw new Error("Sudo execution denied by user.");
+        }
+      }
+    }
+
     return new Promise<string>((resolve, reject) => {
       conn.client.exec(command, (err, stream) => {
         if (err) {
@@ -103,15 +142,20 @@ export class SSHManager {
         let stderr = "";
 
         stream
-          .on("close", (code: number) => {
+          .on("close", (code: number | undefined) => {
             const output = [
               stdout ? `stdout:\n${stdout}` : "",
               stderr ? `stderr:\n${stderr}` : "",
-              `exit code: ${code}`,
+              `exit code: ${code ?? 1}`,
             ]
               .filter(Boolean)
               .join("\n");
-            resolve(output);
+
+            if ((code ?? 1) !== 0) {
+              reject(new Error(output || `Command failed with exit code ${code ?? 1}`));
+              return;
+            }
+            resolve(output || "exit code: 0");
           })
           .on("data", (data: Buffer) => {
             stdout += data.toString();
@@ -141,7 +185,17 @@ export class SSHManager {
       throw new Error(`No active SSH connection: ${connectionId}`);
     }
 
-    const sudoCmd = `echo '${sudoPassword.replace(/'/g, "'\\''")}' | sudo -S ${command}`;
+    // Sudo guard: second-layer protection (skip if Layer 2 already approved)
+    if (this.sudoGuardBypassed) {
+      this.audit?.log("sudo_bypassed", { connectionId, command, reason: "layer2_approved" });
+    } else if (this.sudoGuard) {
+      const approved = await this.sudoGuard(connectionId, command);
+      if (!approved) {
+        throw new Error("Sudo execution denied by user.");
+      }
+    }
+
+    const sudoCmd = `sudo -S -p '' ${command}`;
 
     return new Promise<string>((resolve, reject) => {
       conn.client.exec(sudoCmd, (err, stream) => {
@@ -150,11 +204,13 @@ export class SSHManager {
           return;
         }
 
+        stream.write(`${sudoPassword}\n`);
+
         let stdout = "";
         let stderr = "";
 
         stream
-          .on("close", (code: number) => {
+          .on("close", (code: number | undefined) => {
             const filteredStderr = stderr
               .split("\n")
               .filter((line) => !line.includes("[sudo] password for"))
@@ -164,11 +220,15 @@ export class SSHManager {
             const output = [
               stdout ? `stdout:\n${stdout}` : "",
               filteredStderr ? `stderr:\n${filteredStderr}` : "",
-              `exit code: ${code}`,
+              `exit code: ${code ?? 1}`,
             ]
               .filter(Boolean)
               .join("\n");
-            resolve(output);
+            if ((code ?? 1) !== 0) {
+              reject(new Error(output || `Sudo command failed with exit code ${code ?? 1}`));
+              return;
+            }
+            resolve(output || "exit code: 0");
           })
           .on("data", (data: Buffer) => {
             stdout += data.toString();
@@ -186,6 +246,7 @@ export class SSHManager {
 
     conn.client.end();
     this.connections.delete(connectionId);
+    this.audit?.log("ssh_disconnect", { connectionId });
     return true;
   }
 

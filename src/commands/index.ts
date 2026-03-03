@@ -3,8 +3,9 @@ import { clear } from "./clear.js";
 import { exit } from "./exit.js";
 import { root } from "./root.js";
 import { help } from "./help.js";
+import { init } from "./init.js";
 
-const COMMANDS: Command[] = [clear, exit, root, help];
+const COMMANDS: Command[] = [clear, exit, root, help, init];
 
 export function getCommands(): Command[] {
   return COMMANDS.filter((c) => c.isEnabled);
@@ -16,7 +17,11 @@ export function processCommand(
 ): CommandResult | undefined {
   if (!input.startsWith("/")) return undefined;
 
-  const name = input.slice(1).trim().toLowerCase();
+  const raw = input.slice(1).trim();
+  const spaceIdx = raw.indexOf(" ");
+  const name = spaceIdx === -1 ? raw.toLowerCase() : raw.slice(0, spaceIdx).toLowerCase();
+  const args = spaceIdx === -1 ? "" : raw.slice(spaceIdx + 1).trim();
+
   const command = COMMANDS.find(
     (c) => c.name === name || c.aliases?.includes(name),
   );
@@ -35,7 +40,7 @@ export function processCommand(
     };
   }
 
-  return command.execute(ctx);
+  return command.execute(ctx, args);
 }
 
 export type { Command, CommandContext, CommandResult } from "./types.js";
