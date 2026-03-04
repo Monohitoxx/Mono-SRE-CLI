@@ -3,6 +3,13 @@ import type { ToolDefinition, ToolResult, ToolCall } from "../core/types.js";
 import { ShellTool } from "./ShellTool/index.js";
 import { ThinkTool } from "./ThinkTool/index.js";
 import { PlanTool } from "./PlanTool/index.js";
+import { AskUserTool } from "./AskUserTool/index.js";
+import { WebFetchTool } from "./WebFetchTool/index.js";
+import { WebSearchTool } from "./WebSearchTool/index.js";
+import { MemoryTool } from "./MemoryTool/index.js";
+import { GrepTool } from "./GrepTool/index.js";
+import { ReadManyFilesTool } from "./ReadManyFilesTool/index.js";
+import { FileReadTool } from "./FileReadTool/index.js";
 
 export class ToolRegistry {
   private tools = new Map<string, BaseTool>();
@@ -92,6 +99,13 @@ export function createDefaultRegistry(
   registry.register(new ThinkTool());
   registry.register(new PlanTool());
   registry.register(shellTool);
+  registry.register(new AskUserTool());
+  registry.register(new WebFetchTool());
+  registry.register(new WebSearchTool());
+  registry.register(new MemoryTool());
+  registry.register(new GrepTool());
+  registry.register(new ReadManyFilesTool());
+  registry.register(new FileReadTool());
 
   return registry;
 }

@@ -12,9 +12,11 @@ export class OpenAIProvider implements AIProvider {
   readonly name = "openai";
   readonly model: string;
   private client: OpenAI;
+  private config: EnvConfig;
 
   constructor(config: EnvConfig) {
     this.model = config.MODEL;
+    this.config = config;
     this.client = new OpenAI({
       apiKey: config.APIKEY || "no-key-required",
       baseURL: config.API_BASE_URL || undefined,
@@ -40,12 +42,37 @@ export class OpenAIProvider implements AIProvider {
       },
     }));
 
+    const extraBody: Record<string, unknown> = {};
+    if (this.config.REPETITION_PENALTY !== undefined) {
+      extraBody.repetition_penalty = this.config.REPETITION_PENALTY;
+    }
+    if (this.config.TOP_K !== undefined) {
+      extraBody.top_k = this.config.TOP_K;
+    }
+
     const stream = await this.client.chat.completions.create({
       model: this.model,
       messages: openaiMessages,
       tools: openaiTools?.length ? openaiTools : undefined,
       stream: true,
       stream_options: { include_usage: true },
+      ...(this.config.TEMPERATURE !== undefined && {
+        temperature: this.config.TEMPERATURE,
+      }),
+      ...(this.config.TOP_P !== undefined && { top_p: this.config.TOP_P }),
+      ...(this.config.MAX_TOKENS !== undefined && {
+        max_tokens: this.config.MAX_TOKENS,
+      }),
+      ...(this.config.FREQUENCY_PENALTY !== undefined && {
+        frequency_penalty: this.config.FREQUENCY_PENALTY,
+      }),
+      ...(this.config.PRESENCE_PENALTY !== undefined && {
+        presence_penalty: this.config.PRESENCE_PENALTY,
+      }),
+      ...(this.config.SEED !== undefined && { seed: this.config.SEED }),
+      ...(Object.keys(extraBody).length > 0 && {
+        extra_body: extraBody,
+      }),
     });
 
     const toolCalls = new Map<

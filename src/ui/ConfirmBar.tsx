@@ -56,6 +56,18 @@ function describeToolCall(toolCall: ToolCall): string {
       return `[SUDO] Write ${contentLen} bytes to ${configPath} on ${target}${backup}`;
     }
 
+    case "web_fetch":
+      return `Fetch URL: ${args.url || "(unknown)"}`;
+
+    case "save_memory":
+      return `Save to memory: "${args.fact || "(empty)"}"`;
+
+    case "inventory_add":
+      return `Add host "${args.name}" (${args.username}@${args.ip}:${args.port || 22}) to inventory`;
+
+    case "inventory_remove":
+      return `Remove host "${args.name}" from inventory`;
+
     default:
       return `${name}(${JSON.stringify(args)})`;
   }

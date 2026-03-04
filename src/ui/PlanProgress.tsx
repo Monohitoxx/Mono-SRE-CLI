@@ -23,7 +23,7 @@ function StepIcon({ status }: { status: StepStatus }) {
     if (status !== "in_progress") return;
     const timer = setInterval(() => {
       setFrame((prev) => (prev + 1) % SPINNER_FRAMES.length);
-    }, 80);
+    }, 150);
     return () => clearInterval(timer);
   }, [status]);
 

@@ -1,13 +1,13 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { Text } from "ink";
 
 const FRAMES = ["◐", "◓", "◑", "◒"];
-const INTERVAL = 200;
+const TICK_MS = 500;
 
 interface SpinnerProps {
   label: string;
-  elapsedMs: number;
-  tokens: number;
+  startTime?: number;
+  tokens?: number;
 }
 
 function formatElapsed(ms: number): string {
@@ -23,20 +23,27 @@ function formatTokens(n: number): string {
   return String(n);
 }
 
-export function Spinner({ label, elapsedMs, tokens }: SpinnerProps) {
-  const [frame, setFrame] = useState(0);
+export const Spinner = React.memo(function Spinner({
+  label,
+  startTime,
+  tokens,
+}: SpinnerProps) {
+  const [tick, setTick] = useState(0);
 
   useEffect(() => {
     const timer = setInterval(() => {
-      setFrame((prev) => (prev + 1) % FRAMES.length);
-    }, INTERVAL);
+      setTick((prev) => prev + 1);
+    }, TICK_MS);
     return () => clearInterval(timer);
   }, []);
 
-  const parts = [FRAMES[frame], ` ${label} ${formatElapsed(elapsedMs)}`];
-  if (tokens > 0) {
+  const frameIdx = tick % FRAMES.length;
+  const elapsed = startTime ? Date.now() - startTime : 0;
+
+  const parts = [FRAMES[frameIdx], ` ${label} ${formatElapsed(elapsed)}`];
+  if (tokens && tokens > 0) {
     parts.push(` · ${formatTokens(tokens)} tokens`);
   }
 
   return <Text color="yellow">{parts.join("")}</Text>;
-}
+});

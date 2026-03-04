@@ -18,9 +18,11 @@ import {
   RunHealthcheckTool,
 } from "./tools/RemoteTools/index.js";
 import { InventoryLookupTool } from "./tools/InventoryTool/index.js";
+import { InventoryAddTool, InventoryRemoveTool } from "./tools/InventoryTool/manage.js";
 import { PlanProgressTool } from "./tools/PlanTool/progress.js";
 import { SkillManager } from "./skills/manager.js";
-import type { SkillDefinition } from "./core/types.js";
+import { ActivateSkillTool } from "./tools/ActivateSkillTool/index.js";
+import { loadMemories } from "./tools/MemoryTool/index.js";
 
 const cli = meow(
   `
@@ -52,10 +54,10 @@ async function main() {
   const settings = loadSettings();
 
   if (cli.flags.provider) {
-    (envConfig as Record<string, string>).PROVIDER = cli.flags.provider;
+    (envConfig as unknown as Record<string, unknown>).PROVIDER = cli.flags.provider;
   }
   if (cli.flags.model) {
-    (envConfig as Record<string, string>).MODEL = cli.flags.model;
+    (envConfig as unknown as Record<string, unknown>).MODEL = cli.flags.model;
   }
 
   const cmdCheck = (cmd: string): string | null => {
@@ -79,15 +81,23 @@ async function main() {
   toolRegistry.register(new ServiceControlTool(sshManager));
   toolRegistry.register(new RunHealthcheckTool(sshManager));
   toolRegistry.register(new InventoryLookupTool());
+  toolRegistry.register(new InventoryAddTool());
+  toolRegistry.register(new InventoryRemoveTool());
   toolRegistry.register(new PlanProgressTool());
 
   const skillManager = new SkillManager();
   await skillManager.loadAll();
-  const skillsPrompt = formatSkillsPrompt(skillManager.listSkills());
+  toolRegistry.register(new ActivateSkillTool(skillManager));
+
+  const memories = await loadMemories();
 
   const agent = new Agent(provider, toolRegistry, () => {
     const base = loadSystemPrompt();
-    return skillsPrompt ? `${base}\n\n${skillsPrompt}` : base;
+    const parts = [base];
+    const skillCatalog = skillManager.getSkillCatalogPrompt();
+    if (skillCatalog) parts.push(skillCatalog);
+    if (memories) parts.push(`## Saved Memories\n${memories}`);
+    return parts.join("\n\n");
   });
   agent.setAuditLogger(audit);
 
@@ -101,6 +111,7 @@ async function main() {
       model={envConfig.MODEL}
       sshManager={sshManager}
       audit={audit}
+      initialShowFlow={envConfig.SHOW_FLOW}
     />,
     { patchConsole: false },
   );
@@ -116,22 +127,3 @@ main().catch((err) => {
   process.exit(1);
 });
 
-function formatSkillsPrompt(skills: SkillDefinition[]): string {
-  if (skills.length === 0) return "";
-
-  const lines = [
-    "## Installed Skills",
-    "Use these skills when the user request matches their domain.",
-  ];
-
-  for (const skill of skills) {
-    lines.push("");
-    lines.push(`### ${skill.name}`);
-    lines.push(skill.description);
-    if (skill.body.trim()) {
-      lines.push(skill.body.trim());
-    }
-  }
-
-  return lines.join("\n");
-}

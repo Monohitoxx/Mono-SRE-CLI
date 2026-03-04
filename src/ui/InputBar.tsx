@@ -93,7 +93,7 @@ export function InputBar({ onSubmit, isDisabled }: InputBarProps) {
     if (isDisabled) return;
     const timer = setInterval(() => {
       setCursorVisible((prev) => !prev);
-    }, 500);
+    }, 600);
     return () => clearInterval(timer);
   }, [isDisabled]);
 

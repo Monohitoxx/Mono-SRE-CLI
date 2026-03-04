@@ -12,9 +12,11 @@ export class AnthropicProvider implements AIProvider {
   readonly name = "anthropic";
   readonly model: string;
   private client: Anthropic;
+  private config: EnvConfig;
 
   constructor(config: EnvConfig) {
     this.model = config.MODEL;
+    this.config = config;
     this.client = new Anthropic({
       apiKey: config.APIKEY,
       baseURL: config.API_BASE_URL || undefined,
@@ -42,10 +44,14 @@ export class AnthropicProvider implements AIProvider {
 
     const stream = this.client.messages.stream({
       model: this.model,
-      max_tokens: 8192,
+      max_tokens: this.config.MAX_TOKENS ?? 8192,
       system: systemMsg?.content || "",
       messages: nonSystemMessages,
       tools: anthropicTools?.length ? anthropicTools : undefined,
+      ...(this.config.TEMPERATURE !== undefined && {
+        temperature: this.config.TEMPERATURE,
+      }),
+      ...(this.config.TOP_P !== undefined && { top_p: this.config.TOP_P }),
     });
 
     let fullText = "";

@@ -1,5 +1,5 @@
 import React, { useState, useCallback, useRef, useEffect } from "react";
-import { Box, useApp } from "ink";
+import { Box, useApp, useInput } from "ink";
 import { Header } from "./ui/Header.js";
 import { StatusBar } from "./ui/StatusBar.js";
 import { ChatView, type ChatMessage } from "./ui/ChatView.js";
@@ -11,6 +11,7 @@ import type { ToolRegistry } from "./tools/registry.js";
 import type { ToolCall, Message, TokenUsage } from "./core/types.js";
 import { detectSudo } from "./tools/RemoteTools/index.js";
 import { formatPlanForDisplay, type PlanStep } from "./tools/PlanTool/index.js";
+import { setAskUserHandler } from "./tools/AskUserTool/index.js";
 import { PlanProgress, type ActivePlan } from "./ui/PlanProgress.js";
 import { SudoGuardBar } from "./ui/SudoGuardBar.js";
 import type { SSHManager } from "./utils/ssh-manager.js";
@@ -23,29 +24,22 @@ interface AppProps {
   model: string;
   sshManager: SSHManager;
   audit: AuditLogger;
+  initialShowFlow?: boolean;
 }
 
-export function App({ agent, toolRegistry, provider, model, sshManager, audit }: AppProps) {
+export function App({ agent, toolRegistry, provider, model, sshManager, audit, initialShowFlow = false }: AppProps) {
   const { exit } = useApp();
+  const [showFlow, setShowFlow] = useState(initialShowFlow);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [streamingText, setStreamingText] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [sshHost, setSshHost] = useState<string | undefined>();
   const [rootMode, setRootMode] = useState(false);
-  const [elapsedMs, setElapsedMs] = useState(0);
   const [tokens, setTokens] = useState(0);
   const [activePlan, setActivePlan] = useState<ActivePlan | null>(null);
   const streamingRef = useRef("");
   const rootModeRef = useRef(false);
   const loadingStartRef = useRef<number>(0);
-
-  useEffect(() => {
-    if (!isLoading) return;
-    const timer = setInterval(() => {
-      setElapsedMs(Date.now() - loadingStartRef.current);
-    }, 500);
-    return () => clearInterval(timer);
-  }, [isLoading]);
 
   const [pendingConfirm, setPendingConfirm] = useState<{
     toolCall: ToolCall;
@@ -60,6 +54,20 @@ export function App({ agent, toolRegistry, provider, model, sshManager, audit }:
     resolve: (approved: boolean) => void;
   } | null>(null);
 
+  const [pendingAskUser, setPendingAskUser] = useState<{
+    question: string;
+    resolve: (answer: string) => void;
+  } | null>(null);
+
+  useEffect(() => {
+    setAskUserHandler(async (question: string) => {
+      return new Promise<string>((resolve) => {
+        setPendingAskUser({ question, resolve });
+      });
+    });
+    return () => setAskUserHandler(async () => "");
+  }, []);
+
   useEffect(() => {
     sshManager.setSudoGuard(async (connectionId, command) => {
       return new Promise<boolean>((resolve) => {
@@ -68,6 +76,13 @@ export function App({ agent, toolRegistry, provider, model, sshManager, audit }:
     });
     return () => sshManager.setSudoGuard(undefined);
   }, [sshManager]);
+
+  // Ctrl+O: toggle flow visibility
+  useInput((input, key) => {
+    if (key.ctrl && input === "o") {
+      setShowFlow((prev) => !prev);
+    }
+  });
 
   const enableRootMode = useCallback(() => {
     setRootMode(true);
@@ -117,7 +132,6 @@ export function App({ agent, toolRegistry, provider, model, sshManager, audit }:
       setStreamingText("");
       streamingRef.current = "";
       loadingStartRef.current = Date.now();
-      setElapsedMs(0);
       setTokens(0);
 
       await agent.run(input, {
@@ -137,12 +151,14 @@ export function App({ agent, toolRegistry, provider, model, sshManager, audit }:
           setStreamingText("");
 
           if (toolCall.name === "think") {
+            const thought = String(toolCall.arguments.thought || "");
             setMessages((prev) => [
               ...prev,
               {
                 role: "tool" as const,
-                content: String(toolCall.arguments.thought || ""),
+                content: thought,
                 toolName: "think",
+                summary: `Thinking: ${thought.slice(0, 80).replace(/\n/g, " ")}${thought.length > 80 ? "..." : ""}`,
               },
             ]);
             return;
@@ -157,6 +173,22 @@ export function App({ agent, toolRegistry, provider, model, sshManager, audit }:
                 toolName: "plan",
               },
             ]);
+            return;
+          }
+
+          if (toolCall.name === "ask_user") {
+            setMessages((prev) => [
+              ...prev,
+              {
+                role: "tool" as const,
+                content: String(toolCall.arguments.question || ""),
+                toolName: "ask_user",
+              },
+            ]);
+            return;
+          }
+
+          if (toolCall.name === "activate_skill") {
             return;
           }
 
@@ -185,6 +217,7 @@ export function App({ agent, toolRegistry, provider, model, sshManager, audit }:
               role: "tool" as const,
               content: `${toolCall.name}(${formatArgs(toolCall.arguments)})`,
               toolName: toolCall.name,
+              summary: generateToolSummary(toolCall.name, toolCall.arguments),
             },
           ]);
         },
@@ -226,6 +259,7 @@ export function App({ agent, toolRegistry, provider, model, sshManager, audit }:
             return;
           }
 
+          const resultSummary = generateResultSummary(toolCall.name, toolCall.arguments, result, isError);
           setMessages((prev) => [
             ...prev,
             {
@@ -233,6 +267,7 @@ export function App({ agent, toolRegistry, provider, model, sshManager, audit }:
               content: result,
               toolName: toolCall.name,
               isError,
+              summary: resultSummary,
             },
           ]);
 
@@ -334,8 +369,22 @@ export function App({ agent, toolRegistry, provider, model, sshManager, audit }:
     [pendingSudo, audit],
   );
 
+  const handleAskUserAnswer = useCallback(
+    (answer: string) => {
+      if (!pendingAskUser) return;
+      setMessages((prev) => [
+        ...prev,
+        { role: "user" as const, content: answer },
+      ]);
+      pendingAskUser.resolve(answer);
+      setPendingAskUser(null);
+    },
+    [pendingAskUser],
+  );
+
   const showConfirm = !!pendingConfirm;
   const showSudoGuard = !!pendingSudo;
+  const showAskUser = !!pendingAskUser;
 
   return (
     <Box flexDirection="column" height="100%">
@@ -346,16 +395,18 @@ export function App({ agent, toolRegistry, provider, model, sshManager, audit }:
         isLoading={isLoading}
         sshConnected={sshHost}
         rootMode={rootMode}
-        elapsedMs={elapsedMs}
+        startTime={loadingStartRef.current}
         tokens={tokens}
+        showFlow={showFlow}
       />
       <Box flexDirection="column" flexGrow={1}>
         <ChatView
           messages={messages.filter((m) => m.role !== "system" || m.content)}
           streamingText={streamingText}
           isLoading={isLoading && !pendingConfirm && !pendingSudo}
-          elapsedMs={elapsedMs}
+          startTime={loadingStartRef.current}
           tokens={tokens}
+          showFlow={showFlow}
         />
       </Box>
       {activePlan && <PlanProgress plan={activePlan} />}
@@ -374,7 +425,10 @@ export function App({ agent, toolRegistry, provider, model, sshManager, audit }:
           onConfirm={handleConfirm}
         />
       )}
-      {!showConfirm && !showSudoGuard && (
+      {showAskUser && !showConfirm && !showSudoGuard && (
+        <InputBar onSubmit={handleAskUserAnswer} isDisabled={false} />
+      )}
+      {!showAskUser && !showConfirm && !showSudoGuard && (
         <InputBar onSubmit={handleSubmit} isDisabled={isLoading} />
       )}
     </Box>
@@ -413,4 +467,100 @@ function formatArgs(args: Record<string, unknown>): string {
       return `${k}: ${val}`;
     })
     .join(", ");
+}
+
+// ─── Tool Summary Generation ─────────────────────────────────────────────
+
+function resolveTarget(args: Record<string, unknown>): string {
+  if (typeof args.host === "string") return args.host;
+  if (Array.isArray(args.hosts) && args.hosts.length > 0)
+    return (args.hosts as string[]).join(", ");
+  if (Array.isArray(args.tags) && args.tags.length > 0)
+    return `tags:${(args.tags as string[]).join(",")}`;
+  return "";
+}
+
+function generateToolSummary(toolName: string, args: Record<string, unknown>): string {
+  const target = resolveTarget(args);
+  const on = target ? ` on ${target}` : "";
+
+  switch (toolName) {
+    case "execute_command":
+      return `${String(args.command || "").slice(0, 80)}${on}`;
+    case "service_control":
+      return `Service ${args.action}: ${args.service}${on}`;
+    case "read_config":
+      return `Read config: ${args.config_path}${on}`;
+    case "write_config":
+      return `Write config: ${args.config_path}${on}`;
+    case "run_healthcheck": {
+      const checks = Array.isArray(args.checks) ? (args.checks as string[]).join(", ") : "";
+      return `Health check${on}: ${checks}`;
+    }
+    case "inventory_lookup":
+      return `Inventory lookup: ${args.query}`;
+    case "inventory_add":
+      return `Add host: ${args.name} (${args.ip})`;
+    case "inventory_remove":
+      return `Remove host: ${args.name}`;
+    case "web_search":
+      return `Web search: ${String(args.query || "").slice(0, 60)}`;
+    case "web_fetch":
+      return `Fetch: ${String(args.url || "").slice(0, 60)}`;
+    case "save_memory":
+      return `Save memory: ${String(args.fact || "").slice(0, 60)}`;
+    case "grep_search":
+      return `Search files: ${args.pattern}`;
+    case "read_file":
+      return `Read: ${args.path}`;
+    case "read_many_files": {
+      const count = Array.isArray(args.paths) ? args.paths.length : 0;
+      return `Read ${count} files`;
+    }
+    default:
+      return `${toolName}(${formatArgs(args).slice(0, 60)})`;
+  }
+}
+
+function generateResultSummary(
+  toolName: string,
+  args: Record<string, unknown>,
+  result: string,
+  isError?: boolean,
+): string {
+  const icon = isError ? "✗" : "✓";
+  const target = resolveTarget(args);
+  const on = target ? ` on ${target}` : "";
+
+  switch (toolName) {
+    case "execute_command": {
+      const cmd = String(args.command || "").slice(0, 60);
+      const lines = result.split("\n").filter(Boolean).length;
+      return `${icon} ${cmd}${on} (${lines} lines)`;
+    }
+    case "service_control":
+      return `${icon} Service ${args.action}: ${args.service}${on}`;
+    case "read_config":
+      return `${icon} Read: ${args.config_path}${on}`;
+    case "write_config":
+      return `${icon} Written: ${args.config_path}${on}`;
+    case "run_healthcheck":
+      return `${icon} Health check${on}`;
+    case "web_search":
+      return `${icon} Results for: ${String(args.query || "").slice(0, 50)}`;
+    case "web_fetch":
+      return `${icon} Fetched: ${String(args.url || "").slice(0, 50)}`;
+    case "save_memory":
+      return `${icon} Memory saved`;
+    case "grep_search":
+      return `${icon} Search: ${args.pattern}`;
+    case "read_file":
+      return `${icon} Read: ${args.path}`;
+    case "activate_skill": {
+      const match = result.match(/name="([^"]+)"/);
+      return `${icon} Skill: ${match ? match[1] : "loaded"}`;
+    }
+    default:
+      return `${icon} ${toolName}${on}`;
+  }
 }

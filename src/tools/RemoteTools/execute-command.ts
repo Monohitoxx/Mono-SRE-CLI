@@ -10,7 +10,8 @@ export class ExecuteCommandTool extends BaseTool {
     "Target hosts by name, list, or inventory tags. " +
     "For multi-host targeting, the command runs in parallel on all matched hosts. " +
     "IMPORTANT: Only commands in the system allowlist are permitted — if a command is denied, the error will explain why. " +
-    "Run ONE command per call — do NOT chain with && || ; or |. " +
+    "Run ONE command per call — do NOT chain with &&, ||, or ;. Pipes (|) for filtering output are OK (e.g. 'dpkg -l | grep nginx'). " +
+    "Do NOT add sudo — the system handles privilege escalation automatically. " +
     "Do NOT use this tool for systemctl (use service_control), reading config files (use read_config), or writing config files (use write_config).";
   parameters = {
     type: "object",
@@ -33,10 +34,6 @@ export class ExecuteCommandTool extends BaseTool {
       command: {
         type: "string",
         description: "The command to execute on the remote host(s).",
-      },
-      args: {
-        type: "string",
-        description: "Optional arguments appended to the command.",
       },
     },
     required: ["command"],
@@ -63,10 +60,7 @@ export class ExecuteCommandTool extends BaseTool {
         tags?: string[];
       });
 
-      let command = args.command as string;
-      if (args.args) {
-        command += ` ${args.args}`;
-      }
+      const command = args.command as string;
 
       if (this.commandChecker) {
         const denyReason = this.commandChecker(command);

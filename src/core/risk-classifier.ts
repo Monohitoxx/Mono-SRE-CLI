@@ -76,11 +76,11 @@ const REPO_MODIFY: RegExp[] = [
   /\bcurl\b.*\.repo\b/,
 ];
 
-const CRON_MODIFY: RegExp[] = [/\bcrontab\s+-[er]\b/, /\bat\b\s+/];
+const CRON_MODIFY: RegExp[] = [/\bcrontab\s+-[er]\b/, /^\s*at\s+/];
 
 const DISK_MODIFY: RegExp[] = [
   /\b(mkfs|fdisk|parted|lvm|pvcreate|vgcreate|lvcreate)\b/,
-  /\bmount\b/,
+  /\bmount\s+(-\S+\s+)*\S/,
   /\bumount\b/,
   /\bdd\s+if=/,
 ];
@@ -117,7 +117,7 @@ const READ_ONLY_PATTERNS: RegExp[] = [
   /\b(docker|podman)\s+(ps|images|logs|inspect|stats|port|top|version|info)\b/,
   /\bkubectl\s+(get|describe|logs|top|version|cluster-info|config\s+view)\b/,
   /\bhelm\s+(list|status|get|show|search|repo\s+list)\b/,
-  /\b(curl|wget)\s+.*localhost\b/,
+  /\b(curl|wget)\s+(-[sSkfI]\s+)*https?:\/\/localhost\b/,
   /\b(ping|dig|nslookup|traceroute|tracepath|mtr|host)\b/,
   /\b(ls|find|which|whereis|type|file|stat|du)\b/,
   /\benv\b/,
@@ -125,14 +125,24 @@ const READ_ONLY_PATTERNS: RegExp[] = [
   /\becho\s+\$/,
 ];
 
-// ─── Tools exempt from risk classification ────────────────────────────────
-const EXEMPT_TOOLS = new Set([
+// ─── Tools exempt from plan requirement ───────────────────────────────────
+const PLAN_EXEMPT_TOOLS = new Set([
   "think",
   "plan",
   "plan_progress",
   "inventory_lookup",
   "read_config",
   "run_healthcheck",
+  "ask_user",
+  "web_search",
+  "web_fetch",
+  "save_memory",
+  "grep_search",
+  "read_many_files",
+  "read_file",
+  "inventory_add",
+  "inventory_remove",
+  "activate_skill",
 ]);
 
 // ─── Public API ───────────────────────────────────────────────────────────
@@ -141,8 +151,8 @@ export function classifyToolCallRisk(
   toolName: string,
   args: Record<string, unknown>,
 ): RiskAssessment {
-  if (EXEMPT_TOOLS.has(toolName)) {
-    return { level: "read-only", reason: "exempt tool", matchedPatterns: [] };
+  if (PLAN_EXEMPT_TOOLS.has(toolName)) {
+    return { level: "read-only", reason: "plan-exempt tool", matchedPatterns: [] };
   }
 
   // ─── service_control: classify by action ─────────────────────────────

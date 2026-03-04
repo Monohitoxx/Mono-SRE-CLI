@@ -8,6 +8,17 @@ export const EnvConfigSchema = z.object({
   MODEL: z.string().min(1),
   APIKEY: z.string().default(""),
   API_BASE_URL: z.string().optional(),
+
+  TEMPERATURE: z.number().min(0).max(2).optional(),
+  TOP_P: z.number().min(0).max(1).optional(),
+  TOP_K: z.number().int().optional(),
+  MAX_TOKENS: z.number().int().positive().optional(),
+  REPETITION_PENALTY: z.number().min(0).optional(),
+  FREQUENCY_PENALTY: z.number().min(-2).max(2).optional(),
+  PRESENCE_PENALTY: z.number().min(-2).max(2).optional(),
+  SEED: z.number().int().optional(),
+
+  SHOW_FLOW: z.boolean().default(false),
 });
 export type EnvConfig = z.infer<typeof EnvConfigSchema>;
 
