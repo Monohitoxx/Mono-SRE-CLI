@@ -4,7 +4,7 @@ import meow from "meow";
 import { App } from "./app.js";
 import { loadEnvConfig } from "./config/env.js";
 import { loadSettings, checkCommand } from "./config/settings.js";
-import { loadSystemPrompt } from "./config/prompt.js";
+import { loadSystemPrompt, PLAN_MODE_RULES } from "./config/prompt.js";
 import { createProvider } from "./providers/index.js";
 import { createDefaultRegistry } from "./tools/registry.js";
 import { Agent } from "./core/agent.js";
@@ -71,6 +71,8 @@ async function main() {
   const audit = new AuditLogger();
   const startTime = Date.now();
 
+  const planModeRef = { current: false };
+
   const sshManager = new SSHManager();
   sshManager.setAuditLogger(audit);
   toolRegistry.register(
@@ -92,8 +94,9 @@ async function main() {
   const memories = await loadMemories();
 
   const agent = new Agent(provider, toolRegistry, () => {
-    const base = loadSystemPrompt();
+    const base = loadSystemPrompt(envConfig.MODEL);
     const parts = [base];
+    if (planModeRef.current) parts.push(PLAN_MODE_RULES);
     const skillCatalog = skillManager.getSkillCatalogPrompt();
     if (skillCatalog) parts.push(skillCatalog);
     if (memories) parts.push(`## Saved Memories\n${memories}`);
@@ -102,6 +105,22 @@ async function main() {
   agent.setAuditLogger(audit);
 
   audit.log("session_start", { provider: envConfig.PROVIDER, model: envConfig.MODEL });
+
+  // DEC 2026 Synchronized Output: wraps each Ink render in atomic start/end markers.
+  // The terminal buffers the erase+redraw and presents them together, eliminating flicker.
+  // Supported by: iTerm2, Kitty, WezTerm, Windows Terminal, modern xterm.
+  if (process.stdout.isTTY) {
+    const SYNC_START = "\x1b[?2026h";
+    const SYNC_END = "\x1b[?2026l";
+    const _originalWrite = process.stdout.write.bind(process.stdout);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (process.stdout as any).write = function (chunk: any, enc?: any, cb?: any): boolean {
+      if (typeof chunk === "string" && chunk.includes("\x1b[")) {
+        return _originalWrite(SYNC_START + chunk + SYNC_END, enc, cb);
+      }
+      return _originalWrite(chunk, enc, cb);
+    };
+  }
 
   const { waitUntilExit } = render(
     <App
@@ -112,6 +131,7 @@ async function main() {
       sshManager={sshManager}
       audit={audit}
       initialShowFlow={envConfig.SHOW_FLOW}
+      planModeRef={planModeRef}
     />,
     { patchConsole: false },
   );

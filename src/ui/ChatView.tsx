@@ -350,6 +350,15 @@ function TableBlock({
   );
 }
 
+function HrBlock() {
+  const cols = Math.max(10, (process.stdout.columns || 80) - 6);
+  return (
+    <Box marginTop={1} marginBottom={1}>
+      <Text dimColor>{"  "}{"─".repeat(cols)}</Text>
+    </Box>
+  );
+}
+
 function AssistantFormatted({ content }: { content: string }) {
   const blocks = parseAssistantBlocks(content);
   if (blocks.length === 0) {
@@ -421,14 +430,7 @@ function AssistantFormatted({ content }: { content: string }) {
             );
 
           case "hr":
-            return (
-              <Box key={idx} marginTop={1} marginBottom={1}>
-                <Text dimColor>
-                  {"  "}
-                  {"─".repeat(60)}
-                </Text>
-              </Box>
-            );
+            return <HrBlock key={idx} />;
 
           case "table":
             return (
@@ -536,15 +538,13 @@ const MessageBubble = React.memo(function MessageBubble({
       );
 
     case "tool":
-      if (message.toolName === "think") {
+      if (message.toolName === "model_think") {
         return (
           <Box marginTop={1} flexDirection="column" paddingX={1}>
-            <Text bold color="magenta">
-              {">> "}
-            </Text>
-            <Text color="magenta">
-              {message.content.length > 600
-                ? message.content.slice(0, 600) + "..."
+            <Text bold color="magenta" dimColor>{">> thinking"}</Text>
+            <Text color="magenta" dimColor>
+              {message.content.length > 800
+                ? message.content.slice(0, 800) + "\n..."
                 : message.content}
             </Text>
           </Box>

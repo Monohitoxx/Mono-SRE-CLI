@@ -9,6 +9,8 @@ export interface CommandContext {
   toolRegistry: ToolRegistry;
   rootModeRef: { current: boolean };
   setRootMode: (enabled: boolean) => void;
+  planModeRef: { current: boolean };
+  setPlanMode: (enabled: boolean) => void;
 }
 
 export interface Command {

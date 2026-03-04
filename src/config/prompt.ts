@@ -60,9 +60,7 @@ const ENFORCED_RULES = `
 - Do NOT give up after a permission error — always retry so the system can auto-escalate.
 - This applies to ALL commands and tools.
 
-## Thinking & Transparency (ENFORCED BY SYSTEM)
-- ALWAYS use the \`think\` tool BEFORE creating a plan — reason about the information you gathered first.
-- When executing a plan, use the \`think\` tool BEFORE each action step to explain your reasoning.
+## Transparency (ENFORCED BY SYSTEM)
 - Include a 1-sentence status message when calling tools (e.g. "Checking host connectivity...", "Installing nginx now...").
 - Never silently execute tools without telling the user what you're doing.
 
@@ -74,20 +72,53 @@ const ENFORCED_RULES = `
   - Permission error ("permission denied", "must be root", etc.) = command needs elevated privileges. Retry the same command immediately — the system will auto-escalate.
 - If a remote operation fails on some hosts but succeeds on others, report both outcomes clearly and ask the user how to proceed.`;
 
-export function loadSystemPrompt(): string {
-  const reasonDir = getReasonDir();
-  const promptPath = path.join(reasonDir, "reason");
+export const PLAN_MODE_RULES = `
+## Plan Mode (ACTIVE — ENFORCED BY SYSTEM)
 
-  let basePrompt = DEFAULT_SYSTEM_PROMPT;
+You are currently operating in PLAN MODE. The following rules are MANDATORY and cannot be skipped.
 
-  if (fs.existsSync(promptPath)) {
-    try {
-      const content = fs.readFileSync(promptPath, "utf-8").trim();
-      if (content) basePrompt = content;
-    } catch {
-      // fall through to default
-    }
+### Reasoning Requirements
+- Before responding to any request, think deeply and carefully. Analyse the full scope of the problem.
+- Consider all possible approaches, their trade-offs, risks, side-effects, and dependencies.
+- Identify edge cases and potential failure points before committing to a course of action.
+- Your reasoning must be thorough — do not rush to conclusions.
+
+### Mandatory Planning (EVERY task, no exceptions)
+- For EVERY user request — no matter how small or simple — you MUST call the \`plan\` tool FIRST.
+- The plan must contain a complete, ordered to-do list with specific, actionable steps.
+- Each step must be discrete (one clear action), independently verifiable, and unambiguous.
+- Do NOT begin executing any steps until the user approves the plan.
+- If the user modifies or rejects the plan, revise accordingly before proceeding.
+
+### Execution After Approval
+- Once the plan is approved, execute steps strictly in order.
+- Use \`plan_progress(action="start", step=N)\` before each step and \`plan_progress(action="done", step=N)\` after.
+- Issue only ONE tool call per step — never bundle multiple actions.
+- Report findings clearly after each step before moving to the next.
+- If a step fails, stop and explain the failure to the user before continuing.`;
+
+function loadFilePrompt(filePath: string): string | null {
+  try {
+    const content = fs.readFileSync(filePath, "utf-8").trim();
+    return content || null;
+  } catch {
+    return null;
   }
+}
+
+export function loadSystemPrompt(model?: string): string {
+  const reasonDir = getReasonDir();
+
+  // .reason/reason always wins (manual override)
+  const overridePath = path.join(reasonDir, "reason");
+  const override = loadFilePrompt(overridePath);
+
+  // Model-family prompt files: .reason/<family>.md (e.g. qwen.md)
+  const isQwen = model ? /qwen/i.test(model) : false;
+  const modelPromptPath = isQwen ? path.join(reasonDir, "qwen.md") : null;
+  const modelPrompt = modelPromptPath ? loadFilePrompt(modelPromptPath) : null;
+
+  let basePrompt = override ?? modelPrompt ?? DEFAULT_SYSTEM_PROMPT;
 
   const hint = formatInventoryHint();
   const parts = [basePrompt, ENFORCED_RULES];

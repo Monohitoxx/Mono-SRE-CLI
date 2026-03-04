@@ -4,8 +4,9 @@ import { exit } from "./exit.js";
 import { root } from "./root.js";
 import { help } from "./help.js";
 import { init } from "./init.js";
+import { plan } from "./plan.js";
 
-const COMMANDS: Command[] = [clear, exit, root, help, init];
+const COMMANDS: Command[] = [clear, exit, root, help, init, plan];
 
 export function getCommands(): Command[] {
   return COMMANDS.filter((c) => c.isEnabled);

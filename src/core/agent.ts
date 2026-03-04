@@ -15,9 +15,10 @@ import {
 
 export interface AgentCallbacks {
   onTextDelta: (text: string) => void;
+  onReasoningDelta?: (text: string) => void;
   onToolCallStart: (toolCall: ToolCall) => void;
   onToolCallEnd: (toolCall: ToolCall, result: string, isError?: boolean) => void;
-  onConfirmToolCall: (toolCall: ToolCall) => Promise<boolean>;
+  onConfirmToolCall: (toolCall: ToolCall) => Promise<boolean | string>;
   onUsage: (usage: TokenUsage) => void;
   onDone: (message: Message) => void;
   onError: (error: string) => void;
@@ -29,7 +30,8 @@ export class Agent {
   private conversation: Conversation;
   private isRunning = false;
   private planApprovedForTurn = false;
-  private planNudged = false;
+  private planNudgeCount = 0;
+  private wrapUpSent = false;
   private audit?: AuditLogger;
   // Track binaries that failed with permission errors — persists across turns for the whole session
   private sudoAllowedBinaries = new Set<string>();
@@ -57,7 +59,8 @@ export class Agent {
     if (this.isRunning) return;
     this.isRunning = true;
     this.planApprovedForTurn = false;
-    this.planNudged = false;
+    this.planNudgeCount = 0;
+    this.wrapUpSent = false;
     this.policyBlockCircuit.resetTurnGuards();
 
     try {
@@ -73,8 +76,6 @@ export class Agent {
   private async agentLoop(callbacks: AgentCallbacks): Promise<void> {
     const BASE_ITERATIONS = 20;
     const PLAN_ITERATIONS = 60;
-    // Track whether think was called in the current iteration (for plan execution)
-    let thoughtThisIteration = false;
 
     for (let i = 0; i < (this.planApprovedForTurn ? PLAN_ITERATIONS : BASE_ITERATIONS); i++) {
       const messages = this.conversation.getMessages();
@@ -90,6 +91,9 @@ export class Agent {
           case "text_delta":
             assistantText += event.text;
             callbacks.onTextDelta(event.text);
+            break;
+          case "reasoning_delta":
+            callbacks.onReasoningDelta?.(event.text);
             break;
           case "tool_call_end":
             pendingToolCalls.push(event.toolCall);
@@ -107,15 +111,31 @@ export class Agent {
       }
 
       if (pendingToolCalls.length === 0) {
-        // If a plan is active and AI sent text-only, nudge once to continue.
-        // After nudging, clear the flag so we don't loop forever when the plan is done.
-        if (this.planApprovedForTurn && !this.planNudged) {
-          this.planNudged = true;
+        // If a plan is active and AI sent text-only, nudge up to 3 times.
+        // Qwen models sometimes output a text summary instead of tool calls on the last step.
+        const MAX_NUDGES = 3;
+        if (this.planApprovedForTurn && this.planNudgeCount < MAX_NUDGES) {
+          this.planNudgeCount++;
           this.conversation.addUser(
-            "Continue executing the remaining plan steps. Use the think tool first to reason about the next step, then call the appropriate tool. Do not use sudo unless a previous attempt failed with a permission error.",
+            "You must continue executing the plan using tools — do NOT just describe what you did. " +
+            "Call the appropriate tool (run_healthcheck, execute_command, service_control, etc.) to complete the current in-progress step. " +
+            "Do not stop until all steps are marked done with plan_progress.",
           );
           continue;
         }
+
+        // Nudge limit reached — give the model one chance to explain and ask the user
+        if (!this.wrapUpSent) {
+          this.wrapUpSent = true;
+          this.conversation.addUser(
+            "You have been unable to proceed with tool calls. " +
+            "Please tell the user: (1) what was completed so far, (2) what you were trying to do next, " +
+            "(3) why you cannot proceed (e.g. blocked by policy, requires a plan, permission issue), " +
+            "and (4) ask the user whether they would like you to handle it (e.g. create a plan) or leave it for now.",
+          );
+          continue;
+        }
+
         callbacks.onDone({
           role: "assistant",
           content: assistantText,
@@ -123,43 +143,13 @@ export class Agent {
         return;
       }
 
-      // AI made tool calls — reset nudge flag so it can nudge again if it stalls later
-      this.planNudged = false;
-
-      const THINK_EXEMPT = new Set(["think", "plan_progress"]);
+      // AI made tool calls — reset nudge/wrapup state so it can nudge again if it stalls later
+      this.planNudgeCount = 0;
+      this.wrapUpSent = false;
 
       for (const toolCall of pendingToolCalls) {
         // ─── Audit: log every tool call attempt ─────────────────────
         this.audit?.log("tool_call", { tool: toolCall.name, args: toolCall.arguments });
-
-        // Track think calls
-        if (toolCall.name === "think") {
-          thoughtThisIteration = true;
-        }
-
-        // ─── GATE 0: Think-before-act ────────────────────────────────
-        // Always require think before creating a plan (so LLM reasons about gathered info).
-        // During plan execution, require think before every action tool.
-        const needsThinkFirst =
-          toolCall.name === "plan" ||
-          (this.planApprovedForTurn && !THINK_EXEMPT.has(toolCall.name));
-
-        if (needsThinkFirst && !thoughtThisIteration) {
-          const policyMsg = toolCall.name === "plan"
-            ? "POLICY: Use the think tool to reason about the information you have gathered " +
-              "before creating a plan. Call think first, then create the plan."
-            : "POLICY: During plan execution, you must use the think tool before each action step " +
-              "to explain your reasoning. Call think first, then proceed with this tool.";
-          const shouldStop = this.handlePolicyBlock(
-            toolCall,
-            callbacks,
-            "plan-think-required",
-            policyMsg,
-            "Call think first, then retry.",
-          );
-          if (shouldStop) return;
-          continue;
-        }
 
         // ─── GATE 1: Argument validation (before any UI) ────────────
         const validationError = this.toolRegistry.validateToolCall(toolCall);
@@ -256,9 +246,14 @@ export class Agent {
         callbacks.onToolCallStart(toolCall);
 
         if (needsConfirm) {
-          const approved = await callbacks.onConfirmToolCall(toolCall);
-          if (!approved) {
-            const deniedMsg = `User denied execution of ${toolCall.name}`;
+          const confirmed = await callbacks.onConfirmToolCall(toolCall);
+          if (confirmed !== true) {
+            const userFeedback = typeof confirmed === "string" && confirmed.trim()
+              ? confirmed.trim()
+              : null;
+            const deniedMsg = userFeedback
+              ? `User denied and provided feedback: ${userFeedback}`
+              : `User denied execution of ${toolCall.name}`;
             this.conversation.addToolResult(toolCall.id, deniedMsg, true);
             callbacks.onToolCallEnd(toolCall, deniedMsg, true);
             this.policyBlockCircuit.resetPolicyBlockStreak();
@@ -274,11 +269,6 @@ export class Agent {
         const result = await this.toolRegistry.execute(toolCall);
         this.policyBlockCircuit.resetPolicyBlockStreak();
 
-        // Reset think flag after a non-exempt action tool executes,
-        // so the LLM must think again before the next action step.
-        if (!THINK_EXEMPT.has(toolCall.name)) {
-          thoughtThisIteration = false;
-        }
         this.conversation.addToolResult(
           toolCall.id,
           result.content,

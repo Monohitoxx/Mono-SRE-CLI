@@ -8,6 +8,7 @@ interface StatusBarProps {
   isLoading: boolean;
   sshConnected?: string;
   rootMode?: boolean;
+  planMode?: boolean;
   startTime: number;
   tokens: number;
   showFlow?: boolean;
@@ -19,14 +20,16 @@ export const StatusBar = React.memo(function StatusBar({
   isLoading,
   sshConnected,
   rootMode,
+  planMode,
   startTime,
   tokens,
   showFlow,
 }: StatusBarProps) {
+  const borderColor = rootMode ? "red" : planMode ? "magenta" : isLoading ? "yellow" : "gray";
   return (
     <Box
       borderStyle="round"
-      borderColor={rootMode ? "red" : isLoading ? "yellow" : "gray"}
+      borderColor={borderColor}
       paddingX={1}
       justifyContent="space-between"
     >
@@ -40,6 +43,11 @@ export const StatusBar = React.memo(function StatusBar({
         {rootMode && (
           <Text bold color="red">
             ROOT
+          </Text>
+        )}
+        {planMode && (
+          <Text bold color="magenta">
+            PLAN
           </Text>
         )}
         {!showFlow && (

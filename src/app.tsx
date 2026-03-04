@@ -25,9 +25,10 @@ interface AppProps {
   sshManager: SSHManager;
   audit: AuditLogger;
   initialShowFlow?: boolean;
+  planModeRef: { current: boolean };
 }
 
-export function App({ agent, toolRegistry, provider, model, sshManager, audit, initialShowFlow = false }: AppProps) {
+export function App({ agent, toolRegistry, provider, model, sshManager, audit, initialShowFlow = false, planModeRef }: AppProps) {
   const { exit } = useApp();
   const [showFlow, setShowFlow] = useState(initialShowFlow);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
@@ -35,17 +36,19 @@ export function App({ agent, toolRegistry, provider, model, sshManager, audit, i
   const [isLoading, setIsLoading] = useState(false);
   const [sshHost, setSshHost] = useState<string | undefined>();
   const [rootMode, setRootMode] = useState(false);
+  const [planMode, setPlanModeState] = useState(false);
   const [tokens, setTokens] = useState(0);
   const [activePlan, setActivePlan] = useState<ActivePlan | null>(null);
   const streamingRef = useRef("");
   const streamingFlushRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const reasoningRef = useRef("");
   const rootModeRef = useRef(false);
   const loadingStartRef = useRef<number>(0);
 
   const [pendingConfirm, setPendingConfirm] = useState<{
     toolCall: ToolCall;
     needsRootEscalation: boolean;
-    resolve: (approved: boolean) => void;
+    resolve: (result: boolean | string) => void;
   } | null>(null);
 
   // ─── Sudo Guard: second-layer protection at SSH level ─────────
@@ -101,6 +104,11 @@ export function App({ agent, toolRegistry, provider, model, sshManager, audit, i
             setRootMode(enabled);
             rootModeRef.current = enabled;
           },
+          planModeRef,
+          setPlanMode: (enabled: boolean) => {
+            setPlanModeState(enabled);
+            planModeRef.current = enabled;
+          },
         });
 
         if (!result) return;
@@ -132,20 +140,36 @@ export function App({ agent, toolRegistry, provider, model, sshManager, audit, i
       setIsLoading(true);
       setStreamingText("");
       streamingRef.current = "";
+      reasoningRef.current = "";
       loadingStartRef.current = Date.now();
       setTokens(0);
 
+      const commitPendingReasoning = () => {
+        const text = reasoningRef.current.trim();
+        if (!text) return;
+        setMessages((prev) => [
+          ...prev,
+          { role: "tool" as const, content: text, toolName: "model_think", summary: "Thinking..." },
+        ]);
+        reasoningRef.current = "";
+      };
+
       await agent.run(input, {
+        onReasoningDelta: (text: string) => {
+          reasoningRef.current += text;
+        },
         onTextDelta: (text: string) => {
+          commitPendingReasoning();
           streamingRef.current += text;
           if (!streamingFlushRef.current) {
             streamingFlushRef.current = setTimeout(() => {
               setStreamingText(streamingRef.current);
               streamingFlushRef.current = null;
-            }, 150);
+            }, 350);
           }
         },
         onToolCallStart: (toolCall: ToolCall) => {
+          commitPendingReasoning();
           if (streamingFlushRef.current) {
             clearTimeout(streamingFlushRef.current);
             streamingFlushRef.current = null;
@@ -160,19 +184,6 @@ export function App({ agent, toolRegistry, provider, model, sshManager, audit, i
           streamingRef.current = "";
           setStreamingText("");
 
-          if (toolCall.name === "think") {
-            const thought = String(toolCall.arguments.thought || "");
-            setMessages((prev) => [
-              ...prev,
-              {
-                role: "tool" as const,
-                content: thought,
-                toolName: "think",
-                summary: `Thinking: ${thought.slice(0, 80).replace(/\n/g, " ")}${thought.length > 80 ? "..." : ""}`,
-              },
-            ]);
-            return;
-          }
 
           if (toolCall.name === "plan") {
             setMessages((prev) => [
@@ -232,7 +243,7 @@ export function App({ agent, toolRegistry, provider, model, sshManager, audit, i
           ]);
         },
         onConfirmToolCall: (toolCall: ToolCall) => {
-          return new Promise<boolean>((resolve) => {
+          return new Promise<boolean | string>((resolve) => {
             const isSudo = detectSudoInArgs(toolCall);
             const needsRootEscalation = isSudo && !rootModeRef.current;
             setPendingConfirm({ toolCall, needsRootEscalation, resolve });
@@ -290,6 +301,7 @@ export function App({ agent, toolRegistry, provider, model, sshManager, audit, i
           }
         },
         onDone: (_message: Message) => {
+          commitPendingReasoning();
           if (streamingFlushRef.current) {
             clearTimeout(streamingFlushRef.current);
             streamingFlushRef.current = null;
@@ -312,6 +324,7 @@ export function App({ agent, toolRegistry, provider, model, sshManager, audit, i
           });
         },
         onError: (error: string) => {
+          reasoningRef.current = "";
           if (streamingFlushRef.current) {
             clearTimeout(streamingFlushRef.current);
             streamingFlushRef.current = null;
@@ -335,9 +348,10 @@ export function App({ agent, toolRegistry, provider, model, sshManager, audit, i
   );
 
   const handleConfirm = useCallback(
-    (approved: boolean) => {
+    (result: boolean | string) => {
       if (!pendingConfirm) return;
 
+      const approved = result === true;
       const isSudo = detectSudoInArgs(pendingConfirm.toolCall);
       const auditDetails = {
         tool: pendingConfirm.toolCall.name,
@@ -367,7 +381,7 @@ export function App({ agent, toolRegistry, provider, model, sshManager, audit, i
         audit.log("tool_denied", auditDetails);
       }
 
-      pendingConfirm.resolve(approved);
+      pendingConfirm.resolve(result);
       setPendingConfirm(null);
     },
     [pendingConfirm, enableRootMode, sshManager, audit],
@@ -415,6 +429,7 @@ export function App({ agent, toolRegistry, provider, model, sshManager, audit, i
         isLoading={isLoading}
         sshConnected={sshHost}
         rootMode={rootMode}
+        planMode={planMode}
         startTime={loadingStartRef.current}
         tokens={tokens}
         showFlow={showFlow}
@@ -442,7 +457,7 @@ export function App({ agent, toolRegistry, provider, model, sshManager, audit, i
           toolCall={pendingConfirm!.toolCall}
           isRoot={detectSudoInArgs(pendingConfirm!.toolCall)}
           needsRootEscalation={pendingConfirm!.needsRootEscalation}
-          onConfirm={handleConfirm}
+          onConfirm={handleConfirm as (result: boolean | string) => void}
         />
       )}
       {showAskUser && !showConfirm && !showSudoGuard && (

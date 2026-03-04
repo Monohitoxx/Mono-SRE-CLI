@@ -1,14 +1,141 @@
-import React from "react";
+import React, { useState } from "react";
 import { Box, Text, useInput } from "ink";
 import type { ToolCall } from "../core/types.js";
 import { detectSudo } from "../tools/RemoteTools/index.js";
 
-interface ConfirmBarProps {
+export interface ConfirmBarProps {
   toolCall: ToolCall;
   isRoot?: boolean;
   needsRootEscalation?: boolean;
-  onConfirm: (approved: boolean) => void;
+  onConfirm: (result: boolean | string) => void;
 }
+
+// ─── Shared hook: option navigation + inline text input ──────────────────
+
+function useConfirmSelect(onConfirm: (result: boolean | string) => void) {
+  const [selectedIdx, setSelectedIdx] = useState(0);
+  const [feedbackMode, setFeedbackMode] = useState(false);
+  const [feedbackText, setFeedbackText] = useState("");
+  const [feedbackCursor, setFeedbackCursor] = useState(0);
+
+  const handleSelect = (idx: number) => {
+    if (idx === 0) {
+      onConfirm(true);
+    } else if (idx === 1) {
+      onConfirm(false);
+    } else {
+      setSelectedIdx(2);
+      setFeedbackMode(true);
+    }
+  };
+
+  useInput((input, key) => {
+    if (feedbackMode) {
+      if (key.return) {
+        const text = feedbackText.trim();
+        onConfirm(text || false);
+      } else if (key.escape) {
+        setFeedbackMode(false);
+        setFeedbackText("");
+        setFeedbackCursor(0);
+        setSelectedIdx(2);
+      } else if (key.backspace || key.delete) {
+        if (feedbackCursor > 0) {
+          setFeedbackText((t) => t.slice(0, feedbackCursor - 1) + t.slice(feedbackCursor));
+          setFeedbackCursor((c) => c - 1);
+        }
+      } else if (key.leftArrow) {
+        setFeedbackCursor((c) => Math.max(0, c - 1));
+      } else if (key.rightArrow) {
+        setFeedbackCursor((c) => Math.min(feedbackText.length, c + 1));
+      } else if (input && !key.ctrl && !key.meta) {
+        setFeedbackText((t) => t.slice(0, feedbackCursor) + input + t.slice(feedbackCursor));
+        setFeedbackCursor((c) => c + input.length);
+      }
+      return;
+    }
+
+    if (key.upArrow) {
+      setSelectedIdx((prev) => Math.max(0, prev - 1));
+    } else if (key.downArrow) {
+      setSelectedIdx((prev) => Math.min(2, prev + 1));
+    } else if (key.return) {
+      handleSelect(selectedIdx);
+    } else if (input === "1") {
+      handleSelect(0);
+    } else if (input === "2") {
+      handleSelect(1);
+    } else if (input === "3") {
+      handleSelect(2);
+    }
+  });
+
+  return { selectedIdx, feedbackMode, feedbackText, feedbackCursor };
+}
+
+// ─── Shared sub-components ────────────────────────────────────────────────
+
+const OPTION_LABELS = ["Yes", "No", "Add feedback for AI..."] as const;
+const OPTION_COLORS = ["green", "red", "yellow"] as const;
+
+function OptionList({
+  selectedIdx,
+  feedbackMode,
+  feedbackText,
+  feedbackCursor,
+}: {
+  selectedIdx: number;
+  feedbackMode: boolean;
+  feedbackText: string;
+  feedbackCursor: number;
+}) {
+  return (
+    <Box flexDirection="column" marginTop={1}>
+      {OPTION_LABELS.map((label, i) => {
+        const isSelected = i === selectedIdx;
+        const color = OPTION_COLORS[i];
+        const cursor = isSelected && !feedbackMode ? "❯" : " ";
+        return (
+          <Box key={i} flexDirection="column">
+            <Text color={isSelected && !feedbackMode ? color : "gray"}>
+              {cursor} {i + 1}. {label}
+            </Text>
+            {i === 2 && feedbackMode && (
+              <Box marginLeft={3}>
+                <FeedbackInput text={feedbackText} cursor={feedbackCursor} />
+              </Box>
+            )}
+          </Box>
+        );
+      })}
+      <Box marginTop={1}>
+        {feedbackMode ? (
+          <Text dimColor>Enter to send  ·  Esc to cancel</Text>
+        ) : (
+          <Text dimColor>↑↓ navigate  ·  Enter select  ·  1 / 2 / 3 shortcut</Text>
+        )}
+      </Box>
+    </Box>
+  );
+}
+
+function FeedbackInput({ text, cursor }: { text: string; cursor: number }) {
+  const before = text.slice(0, cursor);
+  const at = text[cursor] ?? " ";
+  const after = text.slice(cursor + 1);
+  return (
+    <Box>
+      <Text color="yellow">{">"} </Text>
+      <Text color="white">{before}</Text>
+      <Text backgroundColor="white" color="black">
+        {at}
+      </Text>
+      <Text color="white">{after}</Text>
+    </Box>
+  );
+}
+
+// ─── Formatters ───────────────────────────────────────────────────────────
 
 function formatTarget(args: Record<string, unknown>): string {
   if (args.tags && Array.isArray(args.tags)) {
@@ -73,20 +200,17 @@ function describeToolCall(toolCall: ToolCall): string {
   }
 }
 
+// ─── Plan confirm ─────────────────────────────────────────────────────────
+
 function PlanConfirmBar({
   toolCall,
   onConfirm,
 }: {
   toolCall: ToolCall;
-  onConfirm: (approved: boolean) => void;
+  onConfirm: (result: boolean | string) => void;
 }) {
-  useInput((input, key) => {
-    if (input === "y" || input === "Y" || key.return) {
-      onConfirm(true);
-    } else if (input === "n" || input === "N" || key.escape) {
-      onConfirm(false);
-    }
-  });
+  const { selectedIdx, feedbackMode, feedbackText, feedbackCursor } =
+    useConfirmSelect(onConfirm);
 
   const title =
     typeof toolCall.arguments.title === "string" && toolCall.arguments.title
@@ -135,18 +259,17 @@ function PlanConfirmBar({
       <Text color="cyan" bold>
         Approve this plan?
       </Text>
-      <Box>
-        <Text color="green" bold>
-          [Y]es
-        </Text>
-        <Text> / </Text>
-        <Text color="red" bold>
-          [N]o
-        </Text>
-      </Box>
+      <OptionList
+        selectedIdx={selectedIdx}
+        feedbackMode={feedbackMode}
+        feedbackText={feedbackText}
+        feedbackCursor={feedbackCursor}
+      />
     </Box>
   );
 }
+
+// ─── Tool confirm ─────────────────────────────────────────────────────────
 
 function ToolConfirmBar({
   toolCall,
@@ -154,13 +277,8 @@ function ToolConfirmBar({
   needsRootEscalation,
   onConfirm,
 }: ConfirmBarProps) {
-  useInput((input, key) => {
-    if (input === "y" || input === "Y" || key.return) {
-      onConfirm(true);
-    } else if (input === "n" || input === "N" || key.escape) {
-      onConfirm(false);
-    }
-  });
+  const { selectedIdx, feedbackMode, feedbackText, feedbackCursor } =
+    useConfirmSelect(onConfirm);
 
   const borderColor = isRoot ? "red" : "yellow";
   const headerColor = isRoot ? "red" : "yellow";
@@ -188,18 +306,17 @@ function ToolConfirmBar({
           : "Confirm tool execution:"}
       </Text>
       <Text color="white">{describeToolCall(toolCall)}</Text>
-      <Box marginTop={1}>
-        <Text color="green" bold>
-          [Y]es
-        </Text>
-        <Text> / </Text>
-        <Text color="red" bold>
-          [N]o
-        </Text>
-      </Box>
+      <OptionList
+        selectedIdx={selectedIdx}
+        feedbackMode={feedbackMode}
+        feedbackText={feedbackText}
+        feedbackCursor={feedbackCursor}
+      />
     </Box>
   );
 }
+
+// ─── Entry point ──────────────────────────────────────────────────────────
 
 export function ConfirmBar(props: ConfirmBarProps) {
   if (props.toolCall.name === "plan") {
