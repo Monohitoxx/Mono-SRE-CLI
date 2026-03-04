@@ -93,28 +93,25 @@ export const InputBar = React.memo(function InputBar({ onSubmit, isDisabled }: I
       borderStyle="round"
       borderColor={isDisabled ? "gray" : "green"}
       paddingX={1}
-      justifyContent="space-between"
     >
-      <Box>
-        <Text color={isDisabled ? "gray" : "green"} bold>
-          {"❯ "}
-        </Text>
-        {value ? (
-          <>
-            <Text color="white">{value.slice(0, cursor)}</Text>
-            <Text color="green" inverse={!isDisabled}>
-              {cursor < value.length ? value[cursor] : " "}
-            </Text>
-            {cursor < value.length && (
-              <Text color="white">{value.slice(cursor + 1)}</Text>
-            )}
-          </>
-        ) : (
-          <Text color="gray" dimColor>
-            {!isDisabled ? "❯ " : ""}Ask for SRE actions, checks, deployments...
+      <Text color={isDisabled ? "gray" : "green"} bold>
+        {"❯ "}
+      </Text>
+      {value ? (
+        <>
+          <Text color="white">{value.slice(0, cursor)}</Text>
+          <Text color="green" inverse={!isDisabled}>
+            {cursor < value.length ? value[cursor] : " "}
           </Text>
-        )}
-      </Box>
+          {cursor < value.length && (
+            <Text color="white">{value.slice(cursor + 1)}</Text>
+          )}
+        </>
+      ) : (
+        <Text color="gray" dimColor>
+          Type a message...
+        </Text>
+      )}
     </Box>
   );
 });
