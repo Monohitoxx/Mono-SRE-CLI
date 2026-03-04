@@ -643,7 +643,7 @@ const MessageBubble = React.memo(function MessageBubble({
 
 // ─── Chat View ───────────────────────────────────────────────────────────
 
-const KEEP_VISIBLE = 8;
+const KEEP_VISIBLE = 2;
 
 export const ChatView = React.memo(function ChatView({
   messages,
