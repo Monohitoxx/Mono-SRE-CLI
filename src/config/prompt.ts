@@ -55,10 +55,9 @@ SSH connections are handled automatically — no need to manually connect/discon
 const ENFORCED_RULES = `
 
 ## Sudo Policy (ENFORCED BY SYSTEM)
-- Do NOT add sudo to your commands. The system handles privilege escalation automatically.
-- Always run commands WITHOUT sudo first.
-- If a command fails with a permission error, just retry the same command without sudo — the system will automatically add sudo for you.
-- Treat "Interactive authentication required" as a permission error.
+- Do NOT add sudo to your commands. Always run commands WITHOUT sudo first.
+- If a command fails with a permission error ("permission denied", "operation not permitted", "must be root", "interactive authentication required"), just retry the SAME command without sudo — the system will automatically escalate privileges for you.
+- Do NOT give up after a permission error — always retry so the system can auto-escalate.
 - This applies to ALL commands and tools.
 
 ## Thinking & Transparency (ENFORCED BY SYSTEM)
@@ -69,8 +68,10 @@ const ENFORCED_RULES = `
 
 ## Command Execution (ENFORCED BY SYSTEM)
 - Run ONE command per execute_command call. Do NOT chain with && || or ;. Pipes (|) for filtering output are OK (e.g. 'dpkg -l | grep nginx').
-- Do NOT add sudo — even if a command output suggests 'Use sudo ...'. The system handles it automatically.
-- Only commands in the system allowlist will execute. If a command is denied, inform the user what was denied and why. Suggest an alternative if one exists. Do NOT silently retry variations of denied commands.
+- Do NOT prefix commands with sudo — even if the output suggests 'Use sudo ...'. The system auto-escalates on retry.
+- **Policy denial** vs **permission error** — these are different:
+  - Policy denial ("Command denied by policy: ...") = command is blocked by the allowlist. Inform the user and suggest alternatives. Do NOT retry.
+  - Permission error ("permission denied", "must be root", etc.) = command needs elevated privileges. Retry the same command immediately — the system will auto-escalate.
 - If a remote operation fails on some hosts but succeeds on others, report both outcomes clearly and ask the user how to proceed.`;
 
 export function loadSystemPrompt(): string {

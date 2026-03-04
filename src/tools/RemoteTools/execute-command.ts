@@ -11,7 +11,7 @@ export class ExecuteCommandTool extends BaseTool {
     "For multi-host targeting, the command runs in parallel on all matched hosts. " +
     "IMPORTANT: Only commands in the system allowlist are permitted — if a command is denied, the error will explain why. " +
     "Run ONE command per call — do NOT chain with &&, ||, or ;. Pipes (|) for filtering output are OK (e.g. 'dpkg -l | grep nginx'). " +
-    "Do NOT add sudo — the system handles privilege escalation automatically. " +
+    "Do NOT prefix with sudo — if you get a permission error, just retry the same command and the system will auto-escalate. " +
     "Do NOT use this tool for systemctl (use service_control), reading config files (use read_config), or writing config files (use write_config).";
   parameters = {
     type: "object",
