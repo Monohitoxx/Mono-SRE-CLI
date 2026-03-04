@@ -10,7 +10,9 @@
     "build": "tsup",
     "dev": "tsup --watch",
     "start": "node dist/cli.js",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "test": "node --import tsx/esm --test tests/unit/risk-classifier.test.ts tests/unit/settings.test.ts tests/unit/command-policy.test.ts tests/integration/agent-gates.test.ts tests/integration/prompt-injection.test.ts",
+    "test:e2e": "node --import tsx/esm --test tests/e2e/prompt-injection-real.test.ts"
   },
   "engines": {
     "node": ">=20"
@@ -34,6 +36,7 @@
     "@types/react": "^18.3.0",
     "@types/ssh2": "^1.15.0",
     "tsup": "^8.0.0",
+    "tsx": "^4.21.0",
     "typescript": "^5.7.0"
   }
 }
