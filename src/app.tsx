@@ -142,7 +142,7 @@ export function App({ agent, toolRegistry, provider, model, sshManager, audit, i
             streamingFlushRef.current = setTimeout(() => {
               setStreamingText(streamingRef.current);
               streamingFlushRef.current = null;
-            }, 80);
+            }, 150);
           }
         },
         onToolCallStart: (toolCall: ToolCall) => {

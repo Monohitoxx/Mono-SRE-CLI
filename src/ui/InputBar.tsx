@@ -6,10 +6,9 @@ interface InputBarProps {
   isDisabled: boolean;
 }
 
-export function InputBar({ onSubmit, isDisabled }: InputBarProps) {
+export const InputBar = React.memo(function InputBar({ onSubmit, isDisabled }: InputBarProps) {
   const [value, setValue] = useState("");
   const [cursor, setCursor] = useState(0);
-  const [cursorVisible, setCursorVisible] = useState(true);
 
   useInput((input, key) => {
     if (isDisabled) return;
@@ -89,18 +88,6 @@ export function InputBar({ onSubmit, isDisabled }: InputBarProps) {
     }
   });
 
-  React.useEffect(() => {
-    if (isDisabled) return;
-    const timer = setInterval(() => {
-      setCursorVisible((prev) => !prev);
-    }, 600);
-    return () => clearInterval(timer);
-  }, [isDisabled]);
-
-  const beforeCursor = value.slice(0, cursor);
-  const afterCursor = value.slice(cursor);
-  const cursorChar = !isDisabled && cursorVisible ? "█" : cursor < value.length ? value[cursor] : " ";
-
   return (
     <Box
       borderStyle="round"
@@ -114,8 +101,8 @@ export function InputBar({ onSubmit, isDisabled }: InputBarProps) {
         </Text>
         {value ? (
           <>
-            <Text color="white">{beforeCursor}</Text>
-            <Text color="green" inverse={!isDisabled && cursorVisible}>
+            <Text color="white">{value.slice(0, cursor)}</Text>
+            <Text color="green" inverse={!isDisabled}>
               {cursor < value.length ? value[cursor] : " "}
             </Text>
             {cursor < value.length && (
@@ -123,19 +110,11 @@ export function InputBar({ onSubmit, isDisabled }: InputBarProps) {
             )}
           </>
         ) : (
-          <>
-            {!isDisabled && cursorVisible && <Text color="green">█</Text>}
-            {!(!isDisabled && cursorVisible) && (
-              <Text color="gray" dimColor>
-                Ask for SRE actions, checks, deployments...
-              </Text>
-            )}
-          </>
+          <Text color="gray" dimColor>
+            {!isDisabled ? "❯ " : ""}Ask for SRE actions, checks, deployments...
+          </Text>
         )}
       </Box>
-      <Text color="gray" dimColor>
-        {value.length}c
-      </Text>
     </Box>
   );
-}
+});
