@@ -645,7 +645,7 @@ const MessageBubble = React.memo(function MessageBubble({
 
 const KEEP_VISIBLE = 8;
 
-export function ChatView({
+export const ChatView = React.memo(function ChatView({
   messages,
   streamingText,
   isLoading,
@@ -688,4 +688,4 @@ export function ChatView({
       )}
     </Box>
   );
-}
+});

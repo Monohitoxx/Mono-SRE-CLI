@@ -1,6 +1,5 @@
-import React, { useEffect, useState } from "react";
+import React from "react";
 import { Box, Text, useStdout } from "ink";
-import { GradientText } from "./Gradient.js";
 import { pickLogo } from "./AsciiArt.js";
 import { Tips } from "./Tips.js";
 
@@ -14,20 +13,13 @@ export function Header({ provider, model, version = "0.1.0" }: HeaderProps) {
   const { stdout } = useStdout();
   const terminalWidth = stdout?.columns ?? 80;
   const logo = pickLogo(terminalWidth);
-  const pulse = ["◢", "◣", "◤", "◥"];
-  const [frame, setFrame] = useState(0);
-
-  useEffect(() => {
-    const timer = setInterval(() => {
-      setFrame((prev) => (prev + 1) % pulse.length);
-    }, 180);
-    return () => clearInterval(timer);
-  }, [pulse.length]);
 
   return (
     <Box flexDirection="column">
       <Box paddingX={1} marginTop={1}>
-        <GradientText>{logo}</GradientText>
+        <Text color="cyan" bold>
+          {logo}
+        </Text>
       </Box>
       <Box
         marginTop={1}
@@ -47,9 +39,6 @@ export function Header({ provider, model, version = "0.1.0" }: HeaderProps) {
             {provider}/<Text bold>{model}</Text>
           </Text>
         </Box>
-        <Text color="yellow">
-          {`${pulse[frame]} LIVE OPS CONSOLE ${pulse[(frame + 2) % pulse.length]}`}
-        </Text>
       </Box>
       <Tips />
     </Box>

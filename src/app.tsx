@@ -1,5 +1,5 @@
 import React, { useState, useCallback, useRef, useEffect } from "react";
-import { Box, useApp, useInput } from "ink";
+import { Box, Static, useApp, useInput } from "ink";
 import { Header } from "./ui/Header.js";
 import { StatusBar } from "./ui/StatusBar.js";
 import { ChatView, type ChatMessage } from "./ui/ChatView.js";
@@ -38,6 +38,7 @@ export function App({ agent, toolRegistry, provider, model, sshManager, audit, i
   const [tokens, setTokens] = useState(0);
   const [activePlan, setActivePlan] = useState<ActivePlan | null>(null);
   const streamingRef = useRef("");
+  const streamingFlushRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const rootModeRef = useRef(false);
   const loadingStartRef = useRef<number>(0);
 
@@ -137,9 +138,18 @@ export function App({ agent, toolRegistry, provider, model, sshManager, audit, i
       await agent.run(input, {
         onTextDelta: (text: string) => {
           streamingRef.current += text;
-          setStreamingText(streamingRef.current);
+          if (!streamingFlushRef.current) {
+            streamingFlushRef.current = setTimeout(() => {
+              setStreamingText(streamingRef.current);
+              streamingFlushRef.current = null;
+            }, 80);
+          }
         },
         onToolCallStart: (toolCall: ToolCall) => {
+          if (streamingFlushRef.current) {
+            clearTimeout(streamingFlushRef.current);
+            streamingFlushRef.current = null;
+          }
           const captured = streamingRef.current.trim();
           if (captured) {
             setMessages((prev) => [
@@ -280,6 +290,10 @@ export function App({ agent, toolRegistry, provider, model, sshManager, audit, i
           }
         },
         onDone: (_message: Message) => {
+          if (streamingFlushRef.current) {
+            clearTimeout(streamingFlushRef.current);
+            streamingFlushRef.current = null;
+          }
           const captured = streamingRef.current.trim();
           if (captured) {
             setMessages((prev) => [
@@ -298,6 +312,10 @@ export function App({ agent, toolRegistry, provider, model, sshManager, audit, i
           });
         },
         onError: (error: string) => {
+          if (streamingFlushRef.current) {
+            clearTimeout(streamingFlushRef.current);
+            streamingFlushRef.current = null;
+          }
           setMessages((prev) => [
             ...prev,
             {
@@ -388,7 +406,9 @@ export function App({ agent, toolRegistry, provider, model, sshManager, audit, i
 
   return (
     <Box flexDirection="column" height="100%">
-      <Header provider={provider} model={model} />
+      <Static items={["header"] as const}>
+        {() => <Header key="header" provider={provider} model={model} />}
+      </Static>
       <StatusBar
         provider={provider}
         model={model}
