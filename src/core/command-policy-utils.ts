@@ -20,7 +20,10 @@ export function isPermissionErrorText(text: string): boolean {
     lower.includes("interactive authentication required") ||
     lower.includes("authentication is required") ||
     lower.includes("must be root") ||
-    lower.includes("not in the sudoers")
+    lower.includes("not in the sudoers") ||
+    lower.includes("superuser privileges") ||
+    lower.includes("run as root") ||
+    lower.includes("requires root")
   );
 }
 

@@ -57,6 +57,12 @@ describe("isPermissionErrorText — truthy cases", () => {
     "must be root",
     "Error: must be root to run",
     "not in the sudoers file. This incident will be reported.",
+    // dnf/rpm/yum on RHEL/CentOS/Fedora
+    "Error: This command has to be run with superuser privileges (under the root user on most systems).",
+    "Error: This command has to be run with superuser privileges",
+    "This operation requires superuser privileges",
+    "you need to run as root",
+    "requires root access to proceed",
     // multi-line output ending with permission error
     "Reading file contents...\nbash: /var/log/secure: permission denied",
   ];
