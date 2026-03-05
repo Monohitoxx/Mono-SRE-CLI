@@ -117,7 +117,7 @@ async function main() {
       initialShowFlow={envConfig.SHOW_FLOW}
       planModeRef={planModeRef}
     />,
-    { patchConsole: false, incrementalRendering: true },
+    { patchConsole: false },
   );
 
   await waitUntilExit();
