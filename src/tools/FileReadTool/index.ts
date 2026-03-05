@@ -6,7 +6,8 @@ import type { ToolResult } from "../../core/types.js";
 export class FileReadTool extends BaseTool {
   name = "read_file";
   description =
-    "Read the contents of a file. Optionally specify a line range to read only part of the file (useful for large files).";
+    "Read a LOCAL file on this machine. For files on remote hosts, use read_config or execute_command with cat instead. " +
+    "Optionally specify a line range to read only part of the file (useful for large files).";
   parameters = {
     type: "object",
     properties: {

@@ -14,6 +14,8 @@ import { formatPlanForDisplay, type PlanStep } from "./tools/PlanTool/index.js";
 import { setAskUserHandler } from "./tools/AskUserTool/index.js";
 import { PlanProgress, type ActivePlan } from "./ui/PlanProgress.js";
 import { SudoGuardBar } from "./ui/SudoGuardBar.js";
+import { SessionPicker } from "./ui/SessionPicker.js";
+import { listSessions, loadSession, type SessionInfo } from "./utils/session-manager.js";
 import type { SSHManager } from "./utils/ssh-manager.js";
 import type { AuditLogger } from "./utils/audit.js";
 import type { Settings } from "./core/types.js";
@@ -36,9 +38,10 @@ interface AppProps {
   planModeRef: { current: boolean };
   settings: Settings;
   sessionAllowedBinaries: Set<string>;
+  onSaveAndExit: (conversationMsgs: Message[], chatMsgs: ChatMessage[]) => void;
 }
 
-export function App({ agent, toolRegistry, provider, model, sshManager, audit, initialShowFlow = false, planModeRef, settings, sessionAllowedBinaries }: AppProps) {
+export function App({ agent, toolRegistry, provider, model, sshManager, audit, initialShowFlow = false, planModeRef, settings, sessionAllowedBinaries, onSaveAndExit }: AppProps) {
   const { exit } = useApp();
   const [showFlow, setShowFlow] = useState(initialShowFlow);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
@@ -54,6 +57,36 @@ export function App({ agent, toolRegistry, provider, model, sshManager, audit, i
   const reasoningRef = useRef("");
   const rootModeRef = useRef(false);
   const loadingStartRef = useRef<number>(0);
+
+  const [pendingResume, setPendingResume] = useState<SessionInfo[] | null>(null);
+
+  const handleExit = useCallback(() => {
+    const conversationMsgs = agent.getHistory();
+    onSaveAndExit(conversationMsgs, messages);
+    exit();
+  }, [agent, messages, onSaveAndExit, exit]);
+
+  const handleResumeSelect = useCallback((sessionId: string) => {
+    const session = loadSession(sessionId);
+    if (!session) {
+      setMessages((prev) => [
+        ...prev,
+        { role: "system" as const, content: "Failed to load session." },
+      ]);
+      setPendingResume(null);
+      return;
+    }
+
+    agent.loadHistory(session.conversationMessages);
+    setMessages([
+      ...session.chatMessages,
+      {
+        role: "system" as const,
+        content: `Session restored (${session.messageCount} messages from ${new Date(session.updatedAt).toLocaleString()})`,
+      },
+    ]);
+    setPendingResume(null);
+  }, [agent]);
 
   const [pendingConfirm, setPendingConfirm] = useState<{
     toolCall: ToolCall;
@@ -126,10 +159,47 @@ export function App({ agent, toolRegistry, provider, model, sshManager, audit, i
 
         if (result.type === "action") {
           if (result.action === "exit") {
-            exit();
+            handleExit();
+            return;
+          } else if (result.action === "resume") {
+            const sessions = listSessions();
+            if (sessions.length === 0) {
+              setMessages((prev) => [
+                ...prev,
+                { role: "system" as const, content: "No saved sessions found." },
+              ]);
+            } else {
+              setPendingResume(sessions);
+            }
+            return;
           } else if (result.action === "clear") {
             setMessages([]);
             agent.clearHistory();
+          } else if (result.action === "compact") {
+            setIsLoading(true);
+            setMessages((prev) => [
+              ...prev,
+              { role: "system" as const, content: "Compacting conversation..." },
+            ]);
+            try {
+              const { messagesBefore } = await agent.compact();
+              setMessages((prev) => [
+                ...prev,
+                {
+                  role: "system" as const,
+                  content: `Conversation compacted: ${messagesBefore} messages → 1 summary.`,
+                },
+              ]);
+            } catch (err) {
+              setMessages((prev) => [
+                ...prev,
+                {
+                  role: "system" as const,
+                  content: `Compact failed: ${(err as Error).message}`,
+                },
+              ]);
+            }
+            setIsLoading(false);
           }
           return;
         }
@@ -311,6 +381,15 @@ export function App({ agent, toolRegistry, provider, model, sshManager, audit, i
         },
         onUsage: (usage: TokenUsage) => {
           setTokens((prev) => prev + usage.inputTokens + usage.outputTokens);
+        },
+        onAutoCompact: () => {
+          setMessages((prev) => [
+            ...prev,
+            {
+              role: "system" as const,
+              content: "[Auto-compact] Conversation history was automatically summarized to stay within token limits.",
+            },
+          ]);
         },
         onToolCallEnd: (
           toolCall: ToolCall,
@@ -531,11 +610,18 @@ export function App({ agent, toolRegistry, provider, model, sshManager, audit, i
           onConfirm={handleConfirm as (result: boolean | string) => void}
         />
       )}
-      {showAskUser && !showConfirm && !showSudoGuard && (
+      {pendingResume && !showSudoGuard && !showConfirm && (
+        <SessionPicker
+          sessions={pendingResume}
+          onSelect={handleResumeSelect}
+          onCancel={() => setPendingResume(null)}
+        />
+      )}
+      {showAskUser && !showConfirm && !showSudoGuard && !pendingResume && (
         <InputBar onSubmit={handleAskUserAnswer} isDisabled={false} />
       )}
-      {!showAskUser && !showConfirm && !showSudoGuard && (
-        <InputBar onSubmit={handleSubmit} isDisabled={isLoading} />
+      {!showAskUser && !showConfirm && !showSudoGuard && !pendingResume && (
+        <InputBar onSubmit={handleSubmit} isDisabled={isLoading} onExit={handleExit} />
       )}
     </Box>
   );

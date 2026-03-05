@@ -5,8 +5,10 @@ import { root } from "./root.js";
 import { help } from "./help.js";
 import { init } from "./init.js";
 import { plan } from "./plan.js";
+import { compact } from "./compact.js";
+import { resume } from "./resume.js";
 
-const COMMANDS: Command[] = [clear, exit, root, help, init, plan];
+const COMMANDS: Command[] = [clear, exit, root, help, init, plan, compact, resume];
 
 export function getCommands(): Command[] {
   return COMMANDS.filter((c) => c.isEnabled);

@@ -18,6 +18,8 @@ export const EnvConfigSchema = z.object({
   PRESENCE_PENALTY: z.number().min(-2).max(2).optional(),
   SEED: z.number().int().optional(),
 
+  CONTEXT_LIMIT: z.number().int().positive().default(131072),
+
   SHOW_FLOW: z.boolean().default(false),
   ENABLE_THINKING: z.boolean().default(false),
   DEBUG_STREAM: z.boolean().default(false),

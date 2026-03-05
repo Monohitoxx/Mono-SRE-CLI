@@ -13,6 +13,7 @@ import {
   stripLeadingSudo,
 } from "./command-policy-utils.js";
 import { sd } from "../utils/stream-debug.js";
+import { generateCompactSummary, shouldAutoCompact } from "./compactor.js";
 
 export interface AgentCallbacks {
   onTextDelta: (text: string) => void;
@@ -23,6 +24,7 @@ export interface AgentCallbacks {
   onToolCallEnd: (toolCall: ToolCall, result: string, isError?: boolean) => void;
   onConfirmToolCall: (toolCall: ToolCall) => Promise<boolean | string>;
   onUsage: (usage: TokenUsage) => void;
+  onAutoCompact?: (summary: string) => void;
   onDone: (message: Message) => void;
   onError: (error: string) => void;
 }
@@ -41,15 +43,19 @@ export class Agent {
   private policyBlockCircuit = new PolicyBlockCircuit();
   private planStepCount = 0;
   private planCompletedSteps = new Set<number>();
+  private lastInputTokens = 0;
+  private contextLimit: number;
 
   constructor(
     provider: AIProvider,
     toolRegistry: ToolRegistry,
     systemPrompt: string | (() => string),
+    contextLimit?: number,
   ) {
     this.provider = provider;
     this.toolRegistry = toolRegistry;
     this.conversation = new Conversation(systemPrompt);
+    this.contextLimit = contextLimit ?? 131072;
   }
 
   setAuditLogger(audit: AuditLogger) {
@@ -85,6 +91,12 @@ export class Agent {
     const PLAN_ITERATIONS = 60;
 
     for (let i = 0; i < (this.planApprovedForTurn ? PLAN_ITERATIONS : BASE_ITERATIONS); i++) {
+      // ─── Auto-compact when approaching context limit ─────────────
+      if (this.lastInputTokens > 0 && shouldAutoCompact(this.lastInputTokens, this.contextLimit)) {
+        sd("AGENT AUTO_COMPACT", { lastInputTokens: this.lastInputTokens, contextLimit: this.contextLimit });
+        await this.compactConversation(callbacks);
+      }
+
       const messages = this.conversation.getMessages();
       const tools = this.toolRegistry.getDefinitions();
 
@@ -112,6 +124,9 @@ export class Agent {
             pendingToolCalls.push(event.toolCall);
             break;
           case "usage":
+            if (event.usage.inputTokens > 0) {
+              this.lastInputTokens = event.usage.inputTokens;
+            }
             callbacks.onUsage(event.usage);
             break;
           case "done":
@@ -356,10 +371,45 @@ export class Agent {
     callbacks.onError("Maximum agent iterations reached.");
   }
 
+  async compact(): Promise<{ messagesBefore: number; summary: string }> {
+    const history = this.conversation.getHistory();
+    const messagesBefore = history.length;
+    const summary = await generateCompactSummary(this.provider, history);
+    this.conversation.compact(
+      `[Conversation compacted — previous context summary]\n${summary}`,
+    );
+    this.lastInputTokens = 0;
+    return { messagesBefore, summary };
+  }
+
+  getHistory(): Message[] {
+    return this.conversation.getHistory();
+  }
+
+  loadHistory(messages: Message[]) {
+    this.conversation.loadHistory(messages);
+  }
+
   clearHistory() {
     this.conversation.clear();
     this.sudoAllowedBinaries.clear();
     this.policyBlockCircuit.resetTurnGuards();
+  }
+
+  private async compactConversation(callbacks: AgentCallbacks): Promise<void> {
+    const history = this.conversation.getHistory();
+    if (history.length < 4) return;
+    try {
+      const summary = await generateCompactSummary(this.provider, history);
+      this.conversation.compact(
+        `[Conversation compacted — previous context summary]\n${summary}`,
+      );
+      this.lastInputTokens = 0;
+      this.audit?.log("auto_compact", { messagesBefore: history.length });
+      callbacks.onAutoCompact?.(summary);
+    } catch (err) {
+      sd("AGENT AUTO_COMPACT_FAILED", { error: (err as Error).message });
+    }
   }
 
   private handlePolicyBlock(

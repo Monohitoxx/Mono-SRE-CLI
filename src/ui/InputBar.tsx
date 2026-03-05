@@ -5,9 +5,10 @@ import { getCommands } from "../commands/index.js";
 interface InputBarProps {
   onSubmit: (value: string) => void;
   isDisabled: boolean;
+  onExit?: () => void;
 }
 
-export const InputBar = React.memo(function InputBar({ onSubmit, isDisabled }: InputBarProps) {
+export const InputBar = React.memo(function InputBar({ onSubmit, isDisabled, onExit }: InputBarProps) {
   // Use refs for immediate mutation (avoids stale closure on rapid paste)
   const valueRef = useRef("");
   const cursorRef = useRef(0);
@@ -132,7 +133,8 @@ export const InputBar = React.memo(function InputBar({ onSubmit, isDisabled }: I
     }
 
     if (key.ctrl && input === "c") {
-      process.exit(0);
+      onExit?.();
+      return;
     }
 
     if (key.ctrl && input === "l") {

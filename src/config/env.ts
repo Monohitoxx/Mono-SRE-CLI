@@ -41,6 +41,7 @@ export function loadEnvConfig(): EnvConfig {
     FREQUENCY_PENALTY: optionalFloat("FREQUENCY_PENALTY"),
     PRESENCE_PENALTY: optionalFloat("PRESENCE_PENALTY"),
     SEED: optionalInt("SEED"),
+    CONTEXT_LIMIT: optionalInt("CONTEXT_LIMIT"),
     SHOW_FLOW: process.env.SHOW_FLOW === "true",
     ENABLE_THINKING: process.env.ENABLE_THINKING === "true",
     DEBUG_STREAM: process.env.DEBUG_STREAM === "true",

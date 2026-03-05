@@ -24,6 +24,9 @@ import { SkillManager } from "./skills/manager.js";
 import { ActivateSkillTool } from "./tools/ActivateSkillTool/index.js";
 import { loadMemories } from "./tools/MemoryTool/index.js";
 import { initStreamDebug } from "./utils/stream-debug.js";
+import { saveSession, pruneOldSessions } from "./utils/session-manager.js";
+import type { Message } from "./core/types.js";
+import type { ChatMessage } from "./ui/ChatView.js";
 
 const cli = meow(
   `
@@ -104,10 +107,18 @@ async function main() {
     if (skillCatalog) parts.push(skillCatalog);
     if (memories) parts.push(`## Saved Memories\n${memories}`);
     return parts.join("\n\n");
-  });
+  }, envConfig.CONTEXT_LIMIT);
   agent.setAuditLogger(audit);
 
   audit.log("session_start", { provider: envConfig.PROVIDER, model: envConfig.MODEL });
+
+  const sessionId = `session-${Date.now()}`;
+  const pendingSave: { conv: Message[]; chat: ChatMessage[] } = { conv: [], chat: [] };
+
+  const handleSaveAndExit = (conv: Message[], chat: ChatMessage[]) => {
+    pendingSave.conv = conv;
+    pendingSave.chat = chat;
+  };
 
   const { waitUntilExit } = render(
     <App
@@ -121,11 +132,19 @@ async function main() {
       planModeRef={planModeRef}
       settings={settings}
       sessionAllowedBinaries={sessionAllowedBinaries}
+      onSaveAndExit={handleSaveAndExit}
     />,
     { patchConsole: false },
   );
 
   await waitUntilExit();
+
+  // Save session after Ink exits
+  if (pendingSave.conv.length > 0) {
+    saveSession(sessionId, pendingSave.conv, pendingSave.chat);
+    pruneOldSessions(20);
+  }
+
   audit.log("session_end", { durationMs: Date.now() - startTime });
   sshManager.disconnectAll();
   process.exit(0);

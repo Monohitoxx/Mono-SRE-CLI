@@ -36,6 +36,14 @@ export class Conversation {
     return [...this.messages];
   }
 
+  loadHistory(messages: Message[]) {
+    this.messages = [...messages];
+  }
+
+  compact(summary: string) {
+    this.messages = [{ role: "user", content: summary }];
+  }
+
   clear() {
     this.messages = [];
   }

@@ -7,8 +7,9 @@ import { assertAbsolutePath, shellQuote } from "./sanitize.js";
 export class ReadConfigTool extends BaseTool {
   name = "read_config";
   description =
-    "Read a configuration file from one or more remote hosts. " +
-    "Returns the file content. Target hosts by name, list, or inventory tags.";
+    "Read any file from one or more remote hosts via SSH (configs, scripts, logs, etc.). " +
+    "Returns the file content. Target hosts by name, list, or inventory tags. " +
+    "Use this instead of read_file when reading files on remote servers.";
   parameters = {
     type: "object",
     properties: {

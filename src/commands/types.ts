@@ -2,7 +2,7 @@ import type { ToolRegistry } from "../tools/registry.js";
 
 export type CommandResult =
   | { type: "message"; content: string }
-  | { type: "action"; action: "exit" | "clear" }
+  | { type: "action"; action: "exit" | "clear" | "compact" | "resume" }
   | null;
 
 export interface CommandContext {
