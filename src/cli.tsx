@@ -107,9 +107,10 @@ async function main() {
   audit.log("session_start", { provider: envConfig.PROVIDER, model: envConfig.MODEL });
 
   // DEC 2026 Synchronized Output: wraps each Ink render in atomic start/end markers.
-  // The terminal buffers the erase+redraw and presents them together, eliminating flicker.
-  // Supported by: iTerm2, Kitty, WezTerm, Windows Terminal, modern xterm.
-  if (process.stdout.isTTY) {
+  // Only enable on local TTY — most SSH terminals don't support DEC 2026
+  // and the unknown escape codes break cursor positioning (flicker + scroll-to-top).
+  const isSSH = !!(process.env.SSH_TTY || process.env.SSH_CONNECTION);
+  if (process.stdout.isTTY && !isSSH) {
     const SYNC_START = "\x1b[?2026h";
     const SYNC_END = "\x1b[?2026l";
     const _originalWrite = process.stdout.write.bind(process.stdout);
