@@ -76,8 +76,8 @@ export class OpenAIProvider implements AIProvider {
     if (this.config.TOP_K !== undefined) {
       extraBody.top_k = this.config.TOP_K;
     }
-    // Enable Qwen3 native thinking mode
-    if (/qwen/i.test(this.model)) {
+    // Enable native thinking mode (opt-in via ENABLE_THINKING env var)
+    if (this.config.ENABLE_THINKING) {
       extraBody.enable_thinking = true;
     }
 
@@ -153,10 +153,17 @@ export class OpenAIProvider implements AIProvider {
             const openMatch = txt.match(/<think(?:ing)?>/);
 
             if (closeMatch && (!openMatch || closeMatch.index! < openMatch.index!)) {
-              // Content before close tag is leaked thinking → reasoning_delta
+              // Orphan </think>: content before close tag was emitted as text_delta
+              // in prior chunks. Emit any remaining pre-tag content as text_delta
+              // (consistent with prior chunks), then signal thinking_boundary so the
+              // app layer can retroactively move all accumulated text to thinking.
               if (closeMatch.index! > 0) {
-                yield { type: "reasoning_delta", text: txt.slice(0, closeMatch.index) };
+                const before = txt.slice(0, closeMatch.index);
+                fullText += before;
+                yield { type: "text_delta", text: before };
               }
+              yield { type: "thinking_boundary" };
+              fullText = "";  // reset — prior text was thinking, not response
               txt = txt.slice(closeMatch.index! + closeMatch[0].length);
               if (txt[0] === "\n") txt = txt.slice(1);
               continue;

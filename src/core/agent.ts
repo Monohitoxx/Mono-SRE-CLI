@@ -16,6 +16,7 @@ import {
 export interface AgentCallbacks {
   onTextDelta: (text: string) => void;
   onReasoningDelta?: (text: string) => void;
+  onThinkingBoundary?: () => void;
   onToolCallStart: (toolCall: ToolCall) => void;
   onToolCallEnd: (toolCall: ToolCall, result: string, isError?: boolean) => void;
   onConfirmToolCall: (toolCall: ToolCall) => Promise<boolean | string>;
@@ -98,6 +99,10 @@ export class Agent {
             break;
           case "reasoning_delta":
             callbacks.onReasoningDelta?.(event.text);
+            break;
+          case "thinking_boundary":
+            assistantText = "";  // prior text was thinking, not response
+            callbacks.onThinkingBoundary?.();
             break;
           case "tool_call_end":
             pendingToolCalls.push(event.toolCall);

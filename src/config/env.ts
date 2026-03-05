@@ -42,6 +42,7 @@ export function loadEnvConfig(): EnvConfig {
     PRESENCE_PENALTY: optionalFloat("PRESENCE_PENALTY"),
     SEED: optionalInt("SEED"),
     SHOW_FLOW: process.env.SHOW_FLOW === "true",
+    ENABLE_THINKING: process.env.ENABLE_THINKING === "true",
   };
 
   return EnvConfigSchema.parse(raw);

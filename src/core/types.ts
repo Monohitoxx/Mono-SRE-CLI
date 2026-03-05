@@ -19,6 +19,7 @@ export const EnvConfigSchema = z.object({
   SEED: z.number().int().optional(),
 
   SHOW_FLOW: z.boolean().default(false),
+  ENABLE_THINKING: z.boolean().default(false),
 });
 export type EnvConfig = z.infer<typeof EnvConfigSchema>;
 
@@ -72,6 +73,7 @@ export interface TokenUsage {
 export type StreamEvent =
   | { type: "text_delta"; text: string }
   | { type: "reasoning_delta"; text: string }
+  | { type: "thinking_boundary" }
   | { type: "tool_call_start"; toolCall: ToolCall }
   | { type: "tool_call_delta"; toolCallId: string; arguments: string }
   | { type: "tool_call_end"; toolCall: ToolCall }

@@ -168,6 +168,17 @@ export function App({ agent, toolRegistry, provider, model, sshManager, audit, i
             }, 350);
           }
         },
+        onThinkingBoundary: () => {
+          // All text_delta accumulated so far was actually thinking content.
+          // Move it retroactively from streaming text to reasoning.
+          const thinkingText = streamingRef.current;
+          streamingRef.current = "";
+          if (thinkingText.trim()) {
+            reasoningRef.current += thinkingText;
+            commitPendingReasoning();
+          }
+          setStreamingText("");
+        },
         onToolCallStart: (toolCall: ToolCall) => {
           commitPendingReasoning();
           if (streamingFlushRef.current) {
