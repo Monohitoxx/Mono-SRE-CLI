@@ -114,6 +114,7 @@ export class OpenAIProvider implements AIProvider {
 
     // State machine for intercepting <think>/<thinking> blocks in content stream
     let inThinkBlock = false;
+    let hadProperThinkBlock = false;  // tracks if we've seen a proper <think>...</think> pair
     let chunkBuf = "";
 
     for await (const chunk of stream) {
@@ -153,17 +154,30 @@ export class OpenAIProvider implements AIProvider {
             const openMatch = txt.match(/<think(?:ing)?>/);
 
             if (closeMatch && (!openMatch || closeMatch.index! < openMatch.index!)) {
-              // Orphan </think>: content before close tag was emitted as text_delta
-              // in prior chunks. Emit any remaining pre-tag content as text_delta
-              // (consistent with prior chunks), then signal thinking_boundary so the
-              // app layer can retroactively move all accumulated text to thinking.
-              if (closeMatch.index! > 0) {
-                const before = txt.slice(0, closeMatch.index);
-                fullText += before;
-                yield { type: "text_delta", text: before };
+              if (!hadProperThinkBlock) {
+                // No proper <think> block seen yet — this orphan </think> marks
+                // the end of initial implicit thinking (model started thinking
+                // without an opening tag). Use thinking_boundary so the app layer
+                // can retroactively move accumulated text to thinking box.
+                if (closeMatch.index! > 0) {
+                  const before = txt.slice(0, closeMatch.index);
+                  fullText += before;
+                  yield { type: "text_delta", text: before };
+                }
+                yield { type: "thinking_boundary" };
+                fullText = "";
+                hadProperThinkBlock = true;
+              } else {
+                // Already had a proper <think> block — this orphan </think> is
+                // likely an artifact. Just emit content before it as text and
+                // strip the tag. Do NOT emit thinking_boundary or we'd sweep
+                // up legitimate response text.
+                if (closeMatch.index! > 0) {
+                  const before = txt.slice(0, closeMatch.index);
+                  fullText += before;
+                  yield { type: "text_delta", text: before };
+                }
               }
-              yield { type: "thinking_boundary" };
-              fullText = "";  // reset — prior text was thinking, not response
               txt = txt.slice(closeMatch.index! + closeMatch[0].length);
               if (txt[0] === "\n") txt = txt.slice(1);
               continue;
@@ -202,6 +216,7 @@ export class OpenAIProvider implements AIProvider {
             txt = txt.slice(closeMatch.index! + closeMatch[0].length);
             if (txt[0] === "\n") txt = txt.slice(1);
             inThinkBlock = false;
+            hadProperThinkBlock = true;
           }
         }
       }
