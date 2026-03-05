@@ -49,13 +49,19 @@ export function checkCommand(command: string, settings: Settings): CommandCheckR
   for (const segment of segments) {
     const seg = segment.replace(/^\s*sudo\s+(-\S+\s+)*/, "").trim();
     const binary = seg.split(/\s+/)[0] || seg;
+    // Extract basename so "/home/user/bin/kafka-topics" matches allowlist "kafka-topics"
+    const binaryName = binary.includes("/") ? binary.split("/").pop()! : binary;
     const matched = allow.some(
-      (pattern) => seg === pattern || seg.startsWith(`${pattern} `),
+      (pattern) =>
+        seg === pattern ||
+        seg.startsWith(`${pattern} `) ||
+        binaryName === pattern ||
+        binaryName.startsWith(`${pattern} `),
     );
     if (!matched) {
       return {
         allowed: false,
-        reason: `"${binary}" is not in the command allowlist. Run each command separately (no &&, ||, ;, |). Allowed commands include: ${allow.slice(0, 15).join(", ")}...`,
+        reason: `"${binaryName}" is not in the command allowlist. Run each command separately (no &&, ||, ;, |). Allowed commands include: ${allow.slice(0, 15).join(", ")}...`,
       };
     }
   }

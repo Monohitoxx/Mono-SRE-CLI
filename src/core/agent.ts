@@ -18,6 +18,7 @@ export interface AgentCallbacks {
   onTextDelta: (text: string) => void;
   onReasoningDelta?: (text: string) => void;
   onThinkingBoundary?: () => void;
+  onIterationEnd?: () => void;
   onToolCallStart: (toolCall: ToolCall) => void;
   onToolCallEnd: (toolCall: ToolCall, result: string, isError?: boolean) => void;
   onConfirmToolCall: (toolCall: ToolCall) => Promise<boolean | string>;
@@ -123,30 +124,35 @@ export class Agent {
       }
 
       if (pendingToolCalls.length === 0) {
-        // If a plan is active and AI sent text-only, nudge up to 3 times.
-        // Qwen models sometimes output a text summary instead of tool calls on the last step.
-        const MAX_NUDGES = 3;
-        if (this.planApprovedForTurn && this.planNudgeCount < MAX_NUDGES) {
-          this.planNudgeCount++;
-          this.conversation.addUser(
-            "You must continue executing the plan using tools — do NOT just describe what you did. " +
-            "Call the appropriate tool (run_healthcheck, execute_command, service_control, etc.) to complete the current in-progress step. " +
-            "Do not stop until all steps are marked done with plan_progress.",
-          );
-          continue;
-        }
+        // Only nudge/wrapUp when a plan is active — normal text-only responses
+        // (e.g. greeting "Hello!") should return immediately.
+        if (this.planApprovedForTurn) {
+          const MAX_NUDGES = 3;
+          if (this.planNudgeCount < MAX_NUDGES) {
+            this.planNudgeCount++;
+            sd("AGENT PLAN_NUDGE", { nudge: this.planNudgeCount });
+            callbacks.onIterationEnd?.();
+            this.conversation.addUser(
+              "You must continue executing the plan using tools — do NOT just describe what you did. " +
+              "Call the appropriate tool (run_healthcheck, execute_command, service_control, etc.) to complete the current in-progress step. " +
+              "Do not stop until all steps are marked done with plan_progress.",
+            );
+            continue;
+          }
 
-        // Nudge limit reached — give the model one chance to explain and ask the user
-        if (!this.wrapUpSent) {
-          this.wrapUpSent = true;
-          sd("AGENT WRAP_UP_SENT", { assistantTextLen: assistantText.length });
-          this.conversation.addUser(
-            "You have been unable to proceed with tool calls. " +
-            "Please tell the user: (1) what was completed so far, (2) what you were trying to do next, " +
-            "(3) why you cannot proceed (e.g. blocked by policy, requires a plan, permission issue), " +
-            "and (4) ask the user whether they would like you to handle it (e.g. create a plan) or leave it for now.",
-          );
-          continue;
+          // Nudge limit reached — give the model one chance to explain and ask the user
+          if (!this.wrapUpSent) {
+            this.wrapUpSent = true;
+            sd("AGENT WRAP_UP_SENT", { assistantTextLen: assistantText.length });
+            callbacks.onIterationEnd?.();
+            this.conversation.addUser(
+              "You have been unable to proceed with tool calls. " +
+              "Please tell the user: (1) what was completed so far, (2) what you were trying to do next, " +
+              "(3) why you cannot proceed (e.g. blocked by policy, requires a plan, permission issue), " +
+              "and (4) ask the user whether they would like you to handle it (e.g. create a plan) or leave it for now.",
+            );
+            continue;
+          }
         }
 
         callbacks.onDone({

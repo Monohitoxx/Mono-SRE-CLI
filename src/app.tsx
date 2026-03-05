@@ -181,6 +181,26 @@ export function App({ agent, toolRegistry, provider, model, sshManager, audit, i
           }
           setStreamingText("");
         },
+        onIterationEnd: () => {
+          // Flush streaming state between agent loop iterations so the next
+          // iteration starts clean (prevents thinking_boundary from sweeping
+          // up legitimate response text from prior iterations).
+          commitPendingReasoning();
+          if (streamingFlushRef.current) {
+            clearTimeout(streamingFlushRef.current);
+            streamingFlushRef.current = null;
+          }
+          const captured = streamingRef.current.trim();
+          sd("APP onIterationEnd", { capturedLen: captured.length });
+          if (captured) {
+            setMessages((prev) => [
+              ...prev,
+              { role: "assistant" as const, content: captured },
+            ]);
+          }
+          streamingRef.current = "";
+          setStreamingText("");
+        },
         onToolCallStart: (toolCall: ToolCall) => {
           commitPendingReasoning();
           if (streamingFlushRef.current) {
