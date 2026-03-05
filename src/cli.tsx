@@ -23,6 +23,7 @@ import { PlanProgressTool } from "./tools/PlanTool/progress.js";
 import { SkillManager } from "./skills/manager.js";
 import { ActivateSkillTool } from "./tools/ActivateSkillTool/index.js";
 import { loadMemories } from "./tools/MemoryTool/index.js";
+import { initStreamDebug } from "./utils/stream-debug.js";
 
 const cli = meow(
   `
@@ -51,6 +52,7 @@ const cli = meow(
 
 async function main() {
   const envConfig = loadEnvConfig();
+  initStreamDebug(envConfig.DEBUG_STREAM);
   const settings = loadSettings();
 
   if (cli.flags.provider) {

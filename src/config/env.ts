@@ -43,6 +43,7 @@ export function loadEnvConfig(): EnvConfig {
     SEED: optionalInt("SEED"),
     SHOW_FLOW: process.env.SHOW_FLOW === "true",
     ENABLE_THINKING: process.env.ENABLE_THINKING === "true",
+    DEBUG_STREAM: process.env.DEBUG_STREAM === "true",
   };
 
   return EnvConfigSchema.parse(raw);

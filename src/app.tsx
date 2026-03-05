@@ -16,6 +16,7 @@ import { PlanProgress, type ActivePlan } from "./ui/PlanProgress.js";
 import { SudoGuardBar } from "./ui/SudoGuardBar.js";
 import type { SSHManager } from "./utils/ssh-manager.js";
 import type { AuditLogger } from "./utils/audit.js";
+import { sd } from "./utils/stream-debug.js";
 
 interface AppProps {
   agent: Agent;
@@ -172,6 +173,7 @@ export function App({ agent, toolRegistry, provider, model, sshManager, audit, i
           // All text_delta accumulated so far was actually thinking content.
           // Move it retroactively from streaming text to reasoning.
           const thinkingText = streamingRef.current;
+          sd("APP thinking_boundary", { streamingLen: thinkingText.length, movedToReasoning: thinkingText.slice(0, 200) });
           streamingRef.current = "";
           if (thinkingText.trim()) {
             reasoningRef.current += thinkingText;
@@ -318,6 +320,7 @@ export function App({ agent, toolRegistry, provider, model, sshManager, audit, i
             streamingFlushRef.current = null;
           }
           const captured = streamingRef.current.trim();
+          sd("APP onDone", { capturedLen: captured.length, captured: captured.slice(0, 200) });
           if (captured) {
             setMessages((prev) => [
               ...prev,

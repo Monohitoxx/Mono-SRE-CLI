@@ -20,6 +20,7 @@ export const EnvConfigSchema = z.object({
 
   SHOW_FLOW: z.boolean().default(false),
   ENABLE_THINKING: z.boolean().default(false),
+  DEBUG_STREAM: z.boolean().default(false),
 });
 export type EnvConfig = z.infer<typeof EnvConfigSchema>;
 

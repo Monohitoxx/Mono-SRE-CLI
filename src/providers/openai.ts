@@ -7,6 +7,7 @@ import type {
   ToolCall,
   EnvConfig,
 } from "../core/types.js";
+import { sd, streamDebugNewRequest } from "../utils/stream-debug.js";
 
 // ─── <think>/<thinking> tag interceptor helpers ───────────────────────────
 // Qwen models emit reasoning in <think>...</think> or <thinking>...</thinking>
@@ -106,6 +107,8 @@ export class OpenAIProvider implements AIProvider {
       }),
     });
 
+    streamDebugNewRequest();
+
     const toolCalls = new Map<
       number,
       { id: string; name: string; arguments: string }
@@ -136,12 +139,14 @@ export class OpenAIProvider implements AIProvider {
         (delta as Record<string, unknown>).reasoning_content as string | undefined ??
         (delta as Record<string, unknown>).reasoning as string | undefined;
       if (reasoningText) {
+        sd("RAW_REASONING", reasoningText);
         const cleaned = stripThinkWrappers(reasoningText);
-        if (cleaned) yield { type: "reasoning_delta", text: cleaned };
+        if (cleaned) { sd("YIELD reasoning_delta (native)", cleaned); yield { type: "reasoning_delta", text: cleaned }; }
       }
 
       // content stream: intercept <think>/<thinking> blocks
       if (delta.content) {
+        sd("RAW_CHUNK", delta.content);
         let txt = chunkBuf + delta.content;
         chunkBuf = "";
 
@@ -159,11 +164,14 @@ export class OpenAIProvider implements AIProvider {
                 // the end of initial implicit thinking (model started thinking
                 // without an opening tag). Use thinking_boundary so the app layer
                 // can retroactively move accumulated text to thinking box.
-                if (closeMatch.index! > 0) {
-                  const before = txt.slice(0, closeMatch.index);
+                const before = closeMatch.index! > 0 ? txt.slice(0, closeMatch.index) : "";
+                sd("ORPHAN_CLOSE (implicit thinking)", { hadProper: false, before, fullText });
+                if (before) {
                   fullText += before;
+                  sd("YIELD text_delta (pre-boundary)", before);
                   yield { type: "text_delta", text: before };
                 }
+                sd("EMIT thinking_boundary");
                 yield { type: "thinking_boundary" };
                 fullText = "";
                 hadProperThinkBlock = true;
@@ -172,9 +180,11 @@ export class OpenAIProvider implements AIProvider {
                 // likely an artifact. Just emit content before it as text and
                 // strip the tag. Do NOT emit thinking_boundary or we'd sweep
                 // up legitimate response text.
-                if (closeMatch.index! > 0) {
-                  const before = txt.slice(0, closeMatch.index);
+                const before = closeMatch.index! > 0 ? txt.slice(0, closeMatch.index) : "";
+                sd("STRIP_ORPHAN_CLOSE (artifact)", { hadProper: true, before });
+                if (before) {
                   fullText += before;
+                  sd("YIELD text_delta (strip-orphan)", before);
                   yield { type: "text_delta", text: before };
                 }
               }
@@ -187,7 +197,8 @@ export class OpenAIProvider implements AIProvider {
               // No opening tag — hold back potential partial tag at end
               const hold = longestPartialMatch(txt, [...OPEN_TAGS, ...CLOSE_TAGS]);
               const safe = txt.slice(0, txt.length - hold);
-              if (safe) { fullText += safe; yield { type: "text_delta", text: safe }; }
+              if (safe) { fullText += safe; sd("YIELD text_delta", safe); yield { type: "text_delta", text: safe }; }
+              if (hold > 0) sd("HOLD_PARTIAL", txt.slice(txt.length - hold));
               chunkBuf = txt.slice(txt.length - hold);
               break;
             }
@@ -195,8 +206,10 @@ export class OpenAIProvider implements AIProvider {
             if (openMatch.index! > 0) {
               const before = txt.slice(0, openMatch.index);
               fullText += before;
+              sd("YIELD text_delta (pre-open)", before);
               yield { type: "text_delta", text: before };
             }
+            sd("ENTER_THINK_BLOCK", { tag: openMatch[0] });
             txt = txt.slice(openMatch.index! + openMatch[0].length);
             if (txt[0] === "\n") txt = txt.slice(1);
             inThinkBlock = true;
@@ -206,13 +219,17 @@ export class OpenAIProvider implements AIProvider {
               // No closing tag yet — hold back potential partial close tag
               const hold = longestPartialMatch(txt, CLOSE_TAGS);
               const safe = txt.slice(0, txt.length - hold);
-              if (safe) yield { type: "reasoning_delta", text: safe };
+              if (safe) { sd("YIELD reasoning_delta", safe); yield { type: "reasoning_delta", text: safe }; }
+              if (hold > 0) sd("HOLD_PARTIAL (think)", txt.slice(txt.length - hold));
               chunkBuf = txt.slice(txt.length - hold);
               break;
             }
             if (closeMatch.index! > 0) {
-              yield { type: "reasoning_delta", text: txt.slice(0, closeMatch.index) };
+              const reasoning = txt.slice(0, closeMatch.index);
+              sd("YIELD reasoning_delta", reasoning);
+              yield { type: "reasoning_delta", text: reasoning };
             }
+            sd("EXIT_THINK_BLOCK");
             txt = txt.slice(closeMatch.index! + closeMatch[0].length);
             if (txt[0] === "\n") txt = txt.slice(1);
             inThinkBlock = false;
@@ -250,6 +267,7 @@ export class OpenAIProvider implements AIProvider {
 
     // Flush any buffered content (shouldn't normally have incomplete tags)
     if (chunkBuf) {
+      sd("FLUSH_BUF", { inThinkBlock, chunkBuf });
       if (inThinkBlock) {
         yield { type: "reasoning_delta", text: chunkBuf };
       } else {
@@ -270,6 +288,8 @@ export class OpenAIProvider implements AIProvider {
       yield { type: "tool_call_end", toolCall };
       resultToolCalls.push(toolCall);
     }
+
+    sd("DONE", { fullTextLen: fullText.length, fullText: fullText.slice(0, 500), toolCallCount: resultToolCalls.length });
 
     yield {
       type: "done",

@@ -12,6 +12,7 @@ import {
   isPermissionErrorText,
   stripLeadingSudo,
 } from "./command-policy-utils.js";
+import { sd } from "../utils/stream-debug.js";
 
 export interface AgentCallbacks {
   onTextDelta: (text: string) => void;
@@ -95,12 +96,14 @@ export class Agent {
         switch (event.type) {
           case "text_delta":
             assistantText += event.text;
+            sd("AGENT text_delta", { len: event.text.length, assistantTextLen: assistantText.length });
             callbacks.onTextDelta(event.text);
             break;
           case "reasoning_delta":
             callbacks.onReasoningDelta?.(event.text);
             break;
           case "thinking_boundary":
+            sd("AGENT thinking_boundary, reset assistantText", { was: assistantText.length });
             assistantText = "";  // prior text was thinking, not response
             callbacks.onThinkingBoundary?.();
             break;
@@ -136,6 +139,7 @@ export class Agent {
         // Nudge limit reached — give the model one chance to explain and ask the user
         if (!this.wrapUpSent) {
           this.wrapUpSent = true;
+          sd("AGENT WRAP_UP_SENT", { assistantTextLen: assistantText.length });
           this.conversation.addUser(
             "You have been unable to proceed with tool calls. " +
             "Please tell the user: (1) what was completed so far, (2) what you were trying to do next, " +
