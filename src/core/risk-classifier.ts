@@ -127,7 +127,6 @@ const READ_ONLY_PATTERNS: RegExp[] = [
 
 // ─── Tools exempt from plan requirement ───────────────────────────────────
 const PLAN_EXEMPT_TOOLS = new Set([
-  "think",
   "plan",
   "plan_progress",
   "inventory_lookup",

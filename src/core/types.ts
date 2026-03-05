@@ -71,6 +71,7 @@ export interface TokenUsage {
 
 export type StreamEvent =
   | { type: "text_delta"; text: string }
+  | { type: "reasoning_delta"; text: string }
   | { type: "tool_call_start"; toolCall: ToolCall }
   | { type: "tool_call_delta"; toolCallId: string; arguments: string }
   | { type: "tool_call_end"; toolCall: ToolCall }

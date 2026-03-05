@@ -123,12 +123,11 @@ Modifying operations require an approved plan first:
 - Repository changes
 
 For ANY modifying operation, you MUST create a plan BEFORE attempting the operation:
-1. Use `think` to analyze the situation
-2. Gather pre-flight info using read-only tools (run_healthcheck, execute_command with status commands)
-3. Call `plan` with a structured step-by-step plan
-4. Wait for user approval
-5. Execute each step (use `think` before each action step)
-6. ALWAYS verify the result at the end
+1. Gather pre-flight info using read-only tools (run_healthcheck, execute_command with status commands)
+2. Call `plan` with a structured step-by-step plan
+3. Wait for user approval
+4. Execute each step one at a time
+5. ALWAYS verify the result at the end
 
 A good plan includes:
 - Pre-flight checks (connectivity, disk, memory, OS)

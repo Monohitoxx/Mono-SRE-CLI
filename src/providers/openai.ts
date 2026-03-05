@@ -8,6 +8,33 @@ import type {
   EnvConfig,
 } from "../core/types.js";
 
+// ─── <think>/<thinking> tag interceptor helpers ───────────────────────────
+// Qwen models emit reasoning in <think>...</think> or <thinking>...</thinking>
+// blocks inside the content stream. We intercept these and re-route them to
+// reasoning_delta events so the UI can handle them separately.
+
+const OPEN_TAGS = ["<thinking>", "<think>"];
+const CLOSE_TAGS = ["</thinking>", "</think>"];
+
+function longestPartialMatch(text: string, tags: string[]): number {
+  let max = 0;
+  for (const tag of tags) {
+    for (let len = Math.min(tag.length - 1, text.length); len >= 1; len--) {
+      if (text.endsWith(tag.slice(0, len))) {
+        if (len > max) max = len;
+        break;
+      }
+    }
+  }
+  return max;
+}
+
+function stripThinkWrappers(text: string): string {
+  return text
+    .replace(/^<think(?:ing)?>\n?/, "")
+    .replace(/\n?<\/think(?:ing)?>$/, "");
+}
+
 export class OpenAIProvider implements AIProvider {
   readonly name = "openai";
   readonly model: string;
@@ -49,6 +76,10 @@ export class OpenAIProvider implements AIProvider {
     if (this.config.TOP_K !== undefined) {
       extraBody.top_k = this.config.TOP_K;
     }
+    // Enable Qwen3 native thinking mode
+    if (/qwen/i.test(this.model)) {
+      extraBody.enable_thinking = true;
+    }
 
     const stream = await this.client.chat.completions.create({
       model: this.model,
@@ -81,6 +112,10 @@ export class OpenAIProvider implements AIProvider {
     >();
     let fullText = "";
 
+    // State machine for intercepting <think>/<thinking> blocks in content stream
+    let inThinkBlock = false;
+    let chunkBuf = "";
+
     for await (const chunk of stream) {
       if (chunk.usage) {
         yield {
@@ -95,9 +130,58 @@ export class OpenAIProvider implements AIProvider {
       const delta = chunk.choices[0]?.delta;
       if (!delta) continue;
 
+      // reasoning_content: explicit thinking field (direct API or some providers)
+      const reasoningText =
+        (delta as Record<string, unknown>).reasoning_content as string | undefined ??
+        (delta as Record<string, unknown>).reasoning as string | undefined;
+      if (reasoningText) {
+        const cleaned = stripThinkWrappers(reasoningText);
+        if (cleaned) yield { type: "reasoning_delta", text: cleaned };
+      }
+
+      // content stream: intercept <think>/<thinking> blocks
       if (delta.content) {
-        fullText += delta.content;
-        yield { type: "text_delta", text: delta.content };
+        let txt = chunkBuf + delta.content;
+        chunkBuf = "";
+
+        while (txt.length > 0) {
+          if (!inThinkBlock) {
+            const openMatch = txt.match(/<think(?:ing)?>/);
+            if (!openMatch) {
+              // No opening tag — hold back potential partial tag at end
+              const hold = longestPartialMatch(txt, OPEN_TAGS);
+              const safe = txt.slice(0, txt.length - hold);
+              if (safe) { fullText += safe; yield { type: "text_delta", text: safe }; }
+              chunkBuf = txt.slice(txt.length - hold);
+              break;
+            }
+            // Emit text before the opening tag
+            if (openMatch.index! > 0) {
+              const before = txt.slice(0, openMatch.index);
+              fullText += before;
+              yield { type: "text_delta", text: before };
+            }
+            txt = txt.slice(openMatch.index! + openMatch[0].length);
+            if (txt[0] === "\n") txt = txt.slice(1);
+            inThinkBlock = true;
+          } else {
+            const closeMatch = txt.match(/<\/think(?:ing)?>/);
+            if (!closeMatch) {
+              // No closing tag yet — hold back potential partial close tag
+              const hold = longestPartialMatch(txt, CLOSE_TAGS);
+              const safe = txt.slice(0, txt.length - hold);
+              if (safe) yield { type: "reasoning_delta", text: safe };
+              chunkBuf = txt.slice(txt.length - hold);
+              break;
+            }
+            if (closeMatch.index! > 0) {
+              yield { type: "reasoning_delta", text: txt.slice(0, closeMatch.index) };
+            }
+            txt = txt.slice(closeMatch.index! + closeMatch[0].length);
+            if (txt[0] === "\n") txt = txt.slice(1);
+            inThinkBlock = false;
+          }
+        }
       }
 
       if (delta.tool_calls) {
@@ -124,6 +208,16 @@ export class OpenAIProvider implements AIProvider {
             };
           }
         }
+      }
+    }
+
+    // Flush any buffered content (shouldn't normally have incomplete tags)
+    if (chunkBuf) {
+      if (inThinkBlock) {
+        yield { type: "reasoning_delta", text: chunkBuf };
+      } else {
+        fullText += chunkBuf;
+        yield { type: "text_delta", text: chunkBuf };
       }
     }
 

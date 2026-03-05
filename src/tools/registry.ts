@@ -1,7 +1,6 @@
 import type { BaseTool, PrivilegeLevel } from "./base.js";
 import type { ToolDefinition, ToolResult, ToolCall } from "../core/types.js";
 import { ShellTool } from "./ShellTool/index.js";
-import { ThinkTool } from "./ThinkTool/index.js";
 import { PlanTool } from "./PlanTool/index.js";
 import { AskUserTool } from "./AskUserTool/index.js";
 import { WebFetchTool } from "./WebFetchTool/index.js";
@@ -96,7 +95,6 @@ export function createDefaultRegistry(
     shellTool.setCommandChecker(commandChecker);
   }
 
-  registry.register(new ThinkTool());
   registry.register(new PlanTool());
   registry.register(shellTool);
   registry.register(new AskUserTool());

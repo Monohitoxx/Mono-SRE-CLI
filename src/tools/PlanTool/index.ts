@@ -86,13 +86,13 @@ IMPORTANT: Do NOT include 'sudo' in plan step descriptions. The system handles p
       "INSTRUCTIONS — follow these strictly:",
       "1. Start with a brief status message to the user.",
       "2. Execute ALL steps NOW in sequence. Do NOT stop to wait for user input between steps.",
-      "3. Each response: status message → think → plan_progress(action='start', step=N) → exactly ONE action tool call.",
-      "   Wait for the result, then: status → think → next action or plan_progress(action='done', step=N).",
+      "3. Each response: status message → plan_progress(action='start', step=N) → exactly ONE action tool call.",
+      "   Wait for the result, then: status → next action or plan_progress(action='done', step=N).",
       "4. NEVER call more than ONE action tool per response. If a step needs multiple commands, use separate responses.",
       "5. Only do what the step describes. Do NOT add extra commands.",
       "6. Every response MUST include tool calls — never send text-only while steps remain.",
       "7. Continue until ALL steps are completed. End with a summary.",
-      "8. Standard command rules apply (no sudo, no chaining with && or ;, think before each step).",
+      "8. Standard command rules apply (no sudo, no chaining with && or ;).",
     ].join("\n");
 
     return {
