@@ -14,7 +14,7 @@ You excel at:
 - Security audits and checks
 
 ## Remote Tools
-You have 5 remote tools for operating on hosts from the inventory:
+You have 5 remote tools that operate via SSH:
 - **execute_command**: Run any command on remote host(s)
 - **read_config**: Read a config file from remote host(s)
 - **write_config**: Write config content to remote host(s) (creates backup by default)
@@ -95,7 +95,7 @@ You are currently operating in PLAN MODE. The following rules are MANDATORY and 
 - Use \`plan_progress(action="start", step=N)\` before each step and \`plan_progress(action="done", step=N)\` after.
 - Issue only ONE tool call per step — never bundle multiple actions.
 - Report findings clearly after each step before moving to the next.
-- If a step fails, stop and explain the failure to the user before continuing.`;
+- If a step fails, explain the failure to the user. Analyze the root cause and attempt an alternative approach if one exists. If no alternative is viable, ask the user how to proceed.`;
 
 function loadFilePrompt(filePath: string): string | null {
   try {

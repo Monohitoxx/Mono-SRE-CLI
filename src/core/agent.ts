@@ -36,6 +36,8 @@ export class Agent {
   // Track binaries that failed with permission errors — persists across turns for the whole session
   private sudoAllowedBinaries = new Set<string>();
   private policyBlockCircuit = new PolicyBlockCircuit();
+  private planStepCount = 0;
+  private planCompletedSteps = new Set<number>();
 
   constructor(
     provider: AIProvider,
@@ -61,6 +63,8 @@ export class Agent {
     this.planApprovedForTurn = false;
     this.planNudgeCount = 0;
     this.wrapUpSent = false;
+    this.planStepCount = 0;
+    this.planCompletedSteps.clear();
     this.policyBlockCircuit.resetTurnGuards();
 
     try {
@@ -193,7 +197,7 @@ export class Agent {
         }
 
         // ─── GATE 3: Sudo-first rejection ───────────────────────────
-        if (toolCall.name === "execute_command") {
+        if (toolCall.name === "execute_command" || toolCall.name === "shell") {
           const cmd = typeof toolCall.arguments.command === "string" ? toolCall.arguments.command.trim() : "";
           const normalized = stripLeadingSudo(cmd);
           const binary = extractBinary(normalized);
@@ -240,6 +244,15 @@ export class Agent {
           }
         }
 
+        // ─── Block duplicate plan creation ──────────────────────────
+        if (toolCall.name === "plan" && this.planApprovedForTurn) {
+          callbacks.onToolCallStart(toolCall);
+          const msg = "A plan is already active. Continue executing the remaining steps instead of creating a new plan.";
+          this.conversation.addToolResult(toolCall.id, msg, true);
+          callbacks.onToolCallEnd(toolCall, msg, true);
+          continue;
+        }
+
         // ─── GATE 4: User confirmation ──────────────────────────────
         const needsConfirm = this.toolRegistry.needsConfirmation(toolCall.name);
 
@@ -278,7 +291,7 @@ export class Agent {
 
         // ─── Track permission failures for sudo escalation ───────────
         if (
-          toolCall.name === "execute_command" &&
+          (toolCall.name === "execute_command" || toolCall.name === "shell") &&
           typeof toolCall.arguments.command === "string"
         ) {
           if (isPermissionErrorText(result.content)) {
@@ -299,10 +312,28 @@ export class Agent {
         // ─── Track plan approval ─────────────────────────────────────
         if (toolCall.name === "plan" && !result.isError) {
           this.planApprovedForTurn = true;
+          this.planStepCount = Array.isArray(toolCall.arguments.steps) ? toolCall.arguments.steps.length : 0;
+          this.planCompletedSteps.clear();
           this.audit?.log("plan_approved", {
             title: String(toolCall.arguments.title || ""),
-            stepCount: Array.isArray(toolCall.arguments.steps) ? toolCall.arguments.steps.length : 0,
+            stepCount: this.planStepCount,
           });
+        }
+
+        // ─── Track plan step completion ──────────────────────────────
+        if (
+          toolCall.name === "plan_progress" &&
+          !result.isError &&
+          toolCall.arguments.action === "done"
+        ) {
+          this.planCompletedSteps.add(toolCall.arguments.step as number);
+          if (this.planStepCount > 0 && this.planCompletedSteps.size >= this.planStepCount) {
+            this.planApprovedForTurn = false;
+            this.conversation.addUser(
+              "[SYSTEM] All plan steps are now completed. Provide a brief summary of results to the user. " +
+              "Do not call any more tools or create a new plan.",
+            );
+          }
         }
       }
     }

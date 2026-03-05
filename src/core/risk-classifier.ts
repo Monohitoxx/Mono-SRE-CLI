@@ -176,14 +176,25 @@ export function classifyToolCallRisk(
     };
   }
 
-  // ─── execute_command: classify by command content ────────────────────
-  const command =
-    typeof args.command === "string" ? args.command.trim() : null;
+  // ─── execute_command / shell: classify by command content ─────────────
+  if (toolName === "execute_command" || toolName === "shell") {
+    const command =
+      typeof args.command === "string" ? args.command.trim() : null;
 
-  if (!command) {
-    return { level: "low", reason: "no command argument", matchedPatterns: [] };
+    if (!command) {
+      return { level: "low", reason: "no command argument", matchedPatterns: [] };
+    }
+
+    return classifyCommand(command);
   }
 
+  // Default: low risk — allow with normal confirmation
+  return { level: "low", reason: "general command", matchedPatterns: [] };
+}
+
+// ─── Shared command classification ────────────────────────────────────────
+
+function classifyCommand(command: string): RiskAssessment {
   // Check plan-required patterns first.
   // For compound commands (e.g. "docker stop ... && docker ps"),
   // any mutating segment should force plan mode.
