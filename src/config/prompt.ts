@@ -66,6 +66,7 @@ const ENFORCED_RULES = `
 
 ## Command Execution (ENFORCED BY SYSTEM)
 - Run ONE command per execute_command call. Do NOT chain with && || or ;. Pipes (|) for filtering output are OK (e.g. 'dpkg -l | grep nginx').
+- Do NOT use grep alternation with \\| (e.g. grep "error\\|crit") — the \\| is parsed as a pipe by the command checker. Use grep -e "error" -e "crit" instead, or run separate grep commands.
 - Do NOT prefix commands with sudo — even if the output suggests 'Use sudo ...'. The system auto-escalates on retry.
 - **Policy denial** vs **permission error** — these are different:
   - Policy denial ("Command denied by policy: ...") = command is blocked by the allowlist. Inform the user and suggest alternatives. Do NOT retry.

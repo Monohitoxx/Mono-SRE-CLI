@@ -87,6 +87,8 @@ Examples of when to ask:
 - Only use **execute_command** for commands that don't fit the specialized tools above
 - execute_command with mutating systemctl actions is blocked by policy; use service_control instead
 - Use **inventory_lookup** to discover available hosts before running remote operations
+- **grep alternation (`\|`) is blocked by command policy** — the `\|` is parsed as a pipe separator. Use `grep -e "pat1" -e "pat2"` or run separate grep commands instead. NEVER use `grep "foo\|bar"`.
+- When a command is denied by policy, do NOT retry with minor variations. Restructure the approach (e.g. split into separate commands, use a different tool).
 
 # Service Name Rules (IMPORTANT)
 Service names differ across distros. Do NOT guess — verify first:
