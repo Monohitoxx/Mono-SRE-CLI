@@ -146,10 +146,25 @@ export class OpenAIProvider implements AIProvider {
 
         while (txt.length > 0) {
           if (!inThinkBlock) {
+            // Check for orphan </think> appearing without a preceding <think>.
+            // This happens when: (a) model starts thinking without <think> tag,
+            // or (b) </think> leaks from reasoning_content into content stream.
+            const closeMatch = txt.match(/<\/think(?:ing)?>/);
             const openMatch = txt.match(/<think(?:ing)?>/);
+
+            if (closeMatch && (!openMatch || closeMatch.index! < openMatch.index!)) {
+              // Content before close tag is leaked thinking → reasoning_delta
+              if (closeMatch.index! > 0) {
+                yield { type: "reasoning_delta", text: txt.slice(0, closeMatch.index) };
+              }
+              txt = txt.slice(closeMatch.index! + closeMatch[0].length);
+              if (txt[0] === "\n") txt = txt.slice(1);
+              continue;
+            }
+
             if (!openMatch) {
               // No opening tag — hold back potential partial tag at end
-              const hold = longestPartialMatch(txt, OPEN_TAGS);
+              const hold = longestPartialMatch(txt, [...OPEN_TAGS, ...CLOSE_TAGS]);
               const safe = txt.slice(0, txt.length - hold);
               if (safe) { fullText += safe; yield { type: "text_delta", text: safe }; }
               chunkBuf = txt.slice(txt.length - hold);
