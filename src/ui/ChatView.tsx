@@ -643,7 +643,7 @@ const MessageBubble = React.memo(function MessageBubble({
 
 // ─── Chat View ───────────────────────────────────────────────────────────
 
-const KEEP_VISIBLE = 2;
+const KEEP_VISIBLE = 0;
 
 export const ChatView = React.memo(function ChatView({
   messages,
@@ -678,7 +678,14 @@ export const ChatView = React.memo(function ChatView({
           <Text bold color="cyan">
             AI TYPING
           </Text>
-          <AssistantFormatted content={streamingText} />
+          {(() => {
+            const MAX_STREAMING_LINES = 15;
+            const lines = streamingText.split('\n');
+            const displayText = lines.length > MAX_STREAMING_LINES
+              ? '...\n' + lines.slice(-MAX_STREAMING_LINES).join('\n')
+              : streamingText;
+            return <AssistantFormatted content={displayText} />;
+          })()}
         </Box>
       )}
       {isLoading && !streamingText && (
