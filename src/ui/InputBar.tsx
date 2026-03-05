@@ -29,6 +29,13 @@ export const InputBar = React.memo(function InputBar({ onSubmit, isDisabled, onE
     : [];
 
   useInput((input, key) => {
+    // Ctrl+C must be handled BEFORE isDisabled check —
+    // otherwise Ink's exitOnCtrlC exits the app without saving session.
+    if (key.ctrl && input === "c") {
+      onExit?.();
+      return;
+    }
+
     if (isDisabled) return;
 
     if (key.return) {
@@ -129,11 +136,6 @@ export const InputBar = React.memo(function InputBar({ onSubmit, isDisabled, onE
       valueRef.current = valueRef.current.slice(0, cursorRef.current);
       setSuggestionIdx(0);
       rerender();
-      return;
-    }
-
-    if (key.ctrl && input === "c") {
-      onExit?.();
       return;
     }
 

@@ -24,7 +24,7 @@ import { SkillManager } from "./skills/manager.js";
 import { ActivateSkillTool } from "./tools/ActivateSkillTool/index.js";
 import { loadMemories } from "./tools/MemoryTool/index.js";
 import { initStreamDebug } from "./utils/stream-debug.js";
-import { saveSession, pruneOldSessions } from "./utils/session-manager.js";
+import { saveSession, pruneOldSessions, generateSessionId } from "./utils/session-manager.js";
 import type { Message } from "./core/types.js";
 import type { ChatMessage } from "./ui/ChatView.js";
 
@@ -112,7 +112,7 @@ async function main() {
 
   audit.log("session_start", { provider: envConfig.PROVIDER, model: envConfig.MODEL });
 
-  const sessionId = `session-${Date.now()}`;
+  const sessionId = generateSessionId();
   const pendingSave: { conv: Message[]; chat: ChatMessage[] } = { conv: [], chat: [] };
 
   const handleSaveAndExit = (conv: Message[], chat: ChatMessage[]) => {

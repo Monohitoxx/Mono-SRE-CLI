@@ -618,7 +618,7 @@ export function App({ agent, toolRegistry, provider, model, sshManager, audit, i
         />
       )}
       {showAskUser && !showConfirm && !showSudoGuard && !pendingResume && (
-        <InputBar onSubmit={handleAskUserAnswer} isDisabled={false} />
+        <InputBar onSubmit={handleAskUserAnswer} isDisabled={false} onExit={handleExit} />
       )}
       {!showAskUser && !showConfirm && !showSudoGuard && !pendingResume && (
         <InputBar onSubmit={handleSubmit} isDisabled={isLoading} onExit={handleExit} />
