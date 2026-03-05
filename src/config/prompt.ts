@@ -56,7 +56,7 @@ const ENFORCED_RULES = `
 
 ## Sudo Policy (ENFORCED BY SYSTEM)
 - Do NOT add sudo to your commands. Always run commands WITHOUT sudo first.
-- If a command fails with a permission error ("permission denied", "operation not permitted", "must be root", "interactive authentication required"), just retry the SAME command without sudo — the system will automatically escalate privileges for you.
+- If a command fails with a permission error ("permission denied", "operation not permitted", "must be root", "interactive authentication required", "authentication is required", "not in the sudoers", "superuser privileges", "run as root", "requires root"), just retry the SAME command without sudo — the system will automatically escalate privileges for you.
 - Do NOT give up after a permission error — always retry so the system can auto-escalate.
 - This applies to ALL commands and tools.
 
@@ -69,7 +69,7 @@ const ENFORCED_RULES = `
 - Do NOT prefix commands with sudo — even if the output suggests 'Use sudo ...'. The system auto-escalates on retry.
 - **Policy denial** vs **permission error** — these are different:
   - Policy denial ("Command denied by policy: ...") = command is blocked by the allowlist. Inform the user and suggest alternatives. Do NOT retry.
-  - Permission error ("permission denied", "must be root", etc.) = command needs elevated privileges. Retry the same command immediately — the system will auto-escalate.
+  - Permission error ("permission denied", "must be root", "superuser privileges", "requires root", etc.) = command needs elevated privileges. Retry the same command immediately — the system will auto-escalate.
 - If a remote operation fails on some hosts but succeeds on others, report both outcomes clearly and ask the user how to proceed.`;
 
 export const PLAN_MODE_RULES = `

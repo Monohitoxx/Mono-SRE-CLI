@@ -1,5 +1,6 @@
 import type { SSHManager } from "../../utils/ssh-manager.js";
 import { resolveTargets, type HostEntry } from "../../config/inventory.js";
+import { isPermissionErrorText } from "../../core/command-policy-utils.js";
 
 export interface HostResult {
   host: string;
@@ -22,18 +23,6 @@ function stripLeadingSudo(command: string): string {
   return command.replace(/^\s*sudo\s+(-\S+\s+)*/, "").trim();
 }
 
-function hasPermissionError(output: string): boolean {
-  const lower = output.toLowerCase();
-  return (
-    lower.includes("permission denied") ||
-    lower.includes("operation not permitted") ||
-    lower.includes("access denied") ||
-    lower.includes("interactive authentication required") ||
-    lower.includes("authentication is required") ||
-    lower.includes("must be root") ||
-    lower.includes("not in the sudoers")
-  );
-}
 
 export class RemoteExecutor {
   private sshManager: SSHManager;
@@ -170,7 +159,7 @@ export class RemoteExecutor {
       return await this.exec(connectionId, command);
     } catch (err) {
       const msg = (err as Error).message;
-      if (!hasPermissionError(msg)) {
+      if (!isPermissionErrorText(msg)) {
         throw err;
       }
       return this.execSudo(connectionId, command);

@@ -28,11 +28,11 @@ function buildCheckCommand(check: string): { label: string; command: string } {
   }
 
   if (trimmed === "disk") {
-    return { label: "Disk", command: "df -h --output=target,pcent,avail | head -20" };
+    return { label: "Disk", command: "df -h | awk 'NR==1{print \"Mountpoint\",\"Use%\",\"Avail\"} NR>1{print $6,$5,$4}' | head -20" };
   }
 
   if (trimmed === "memory") {
-    return { label: "Memory", command: "free -h" };
+    return { label: "Memory", command: "free -h 2>/dev/null || awk '/MemTotal/{t=$2} /MemAvailable/{a=$2} END{printf \"Total: %dMB  Available: %dMB\\n\",t/1024,a/1024}' /proc/meminfo" };
   }
 
   if (trimmed === "cpu") {
@@ -43,7 +43,7 @@ function buildCheckCommand(check: string): { label: string; command: string } {
     const port = parsePort(trimmed.slice(5));
     return {
       label: `Port ${port}`,
-      command: `ss -tlnp | grep ':${port} ' && echo "LISTENING" || echo "NOT LISTENING"`,
+      command: `{ ss -tlnp 2>/dev/null || netstat -tlnp 2>/dev/null; } | grep -q ':${port} ' && echo "LISTENING" || echo "NOT LISTENING"`,
     };
   }
 

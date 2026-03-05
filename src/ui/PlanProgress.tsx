@@ -37,9 +37,26 @@ function StepIcon({ status }: { status: StepStatus }) {
   }
 }
 
+const MAX_VISIBLE_STEPS = 7;
+
 export function PlanProgress({ plan }: { plan: ActivePlan }) {
   const doneCount = plan.steps.filter((s) => s.status === "done").length;
   const total = plan.steps.length;
+
+  // Sliding window: keep the active step visible, prefer showing recent progress
+  const activeIdx = plan.steps.findIndex((s) => s.status === "in_progress");
+  let windowStart = 0;
+  if (total > MAX_VISIBLE_STEPS) {
+    if (activeIdx === -1) {
+      windowStart = total - MAX_VISIBLE_STEPS;
+    } else {
+      windowStart = Math.max(0, Math.min(activeIdx - 2, total - MAX_VISIBLE_STEPS));
+    }
+  }
+  const windowEnd = Math.min(total, windowStart + MAX_VISIBLE_STEPS);
+  const visibleSteps = plan.steps.slice(windowStart, windowEnd);
+  const hiddenBefore = windowStart;
+  const hiddenAfter = total - windowEnd;
 
   return (
     <Box
@@ -57,7 +74,10 @@ export function PlanProgress({ plan }: { plan: ActivePlan }) {
           {doneCount}/{total}
         </Text>
       </Box>
-      {plan.steps.map((step) => (
+      {hiddenBefore > 0 && (
+        <Text dimColor>  ⋯ {hiddenBefore} completed</Text>
+      )}
+      {visibleSteps.map((step) => (
         <Box key={step.id} gap={1}>
           <StepIcon status={step.status} />
           <Text
@@ -74,6 +94,9 @@ export function PlanProgress({ plan }: { plan: ActivePlan }) {
           </Text>
         </Box>
       ))}
+      {hiddenAfter > 0 && (
+        <Text dimColor>  ⋯ {hiddenAfter} more</Text>
+      )}
     </Box>
   );
 }

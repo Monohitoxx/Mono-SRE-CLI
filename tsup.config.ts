@@ -11,7 +11,7 @@ export default defineConfig({
   banner: {
     js: '#!/usr/bin/env node',
   },
-  external: ["react", "ink", "yoga-wasm-web"],
+  external: ["react", "ink", "yoga-layout"],
   noExternal: [],
   esbuildOptions(options) {
     options.jsx = "automatic";

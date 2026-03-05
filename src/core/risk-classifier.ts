@@ -17,7 +17,7 @@ export interface RiskAssessment {
 // Any command matching these MUST have an approved plan before execution.
 
 const PKG_MODIFY: RegExp[] = [
-  /\b(dnf|yum|apt-get|apt|zypper|pacman|brew)\s+(install|remove|erase|purge|upgrade|update|downgrade|autoremove)\b/,
+  /\b(dnf|yum|apt-get|apt|zypper|pacman|brew|apk)\s+(install|remove|erase|purge|upgrade|update|downgrade|autoremove|add|del)\b/,
   /\b(pip|pip3)\s+install\b/,
   /\bnpm\s+(install\s+-g|uninstall\s+-g)\b/,
   /\bgem\s+install\b/,
@@ -112,7 +112,7 @@ const READ_ONLY_PATTERNS: RegExp[] = [
   /\b(netstat|ss|ip\s+(addr|route|link)\s+show)\b/,
   /\b(hostname|uname|id|whoami|groups|getent)\b/,
   /\bcat\s+\/etc\/(os-release|redhat-release|hostname|hosts|resolv\.conf)\b/,
-  /\b(dnf|yum|apt|apt-cache)\s+(list|search|info|show|repolist|check-update)\b/,
+  /\b(dnf|yum|apt|apt-cache|apk)\s+(list|search|info|show|repolist|check-update)\b/,
   /\b(rpm\s+-q|dpkg\s+-[lLs])\b/,
   /\b(docker|podman)\s+(ps|images|logs|inspect|stats|port|top|version|info)\b/,
   /\bkubectl\s+(get|describe|logs|top|version|cluster-info|config\s+view)\b/,
