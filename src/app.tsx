@@ -16,7 +16,14 @@ import { PlanProgress, type ActivePlan } from "./ui/PlanProgress.js";
 import { SudoGuardBar } from "./ui/SudoGuardBar.js";
 import type { SSHManager } from "./utils/ssh-manager.js";
 import type { AuditLogger } from "./utils/audit.js";
+import type { Settings } from "./core/types.js";
+import { checkCommand, extractCommandBinary } from "./config/settings.js";
 import { sd } from "./utils/stream-debug.js";
+
+const DESTRUCTIVE_BINARIES = new Set([
+  "rm", "rmdir", "mkfs", "dd", "shred", "wipefs",
+  "fdisk", "parted", "format",
+]);
 
 interface AppProps {
   agent: Agent;
@@ -27,9 +34,11 @@ interface AppProps {
   audit: AuditLogger;
   initialShowFlow?: boolean;
   planModeRef: { current: boolean };
+  settings: Settings;
+  sessionAllowedBinaries: Set<string>;
 }
 
-export function App({ agent, toolRegistry, provider, model, sshManager, audit, initialShowFlow = false, planModeRef }: AppProps) {
+export function App({ agent, toolRegistry, provider, model, sshManager, audit, initialShowFlow = false, planModeRef, settings, sessionAllowedBinaries }: AppProps) {
   const { exit } = useApp();
   const [showFlow, setShowFlow] = useState(initialShowFlow);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
@@ -49,6 +58,7 @@ export function App({ agent, toolRegistry, provider, model, sshManager, audit, i
   const [pendingConfirm, setPendingConfirm] = useState<{
     toolCall: ToolCall;
     needsRootEscalation: boolean;
+    sessionAllowBinary?: string;
     resolve: (result: boolean | string) => void;
   } | null>(null);
 
@@ -279,7 +289,24 @@ export function App({ agent, toolRegistry, provider, model, sshManager, audit, i
           return new Promise<boolean | string>((resolve) => {
             const isSudo = detectSudoInArgs(toolCall);
             const needsRootEscalation = isSudo && !rootModeRef.current;
-            setPendingConfirm({ toolCall, needsRootEscalation, resolve });
+
+            // Detect if this command would be blocked by allowlist (but NOT deny list)
+            let sessionAllowBinary: string | undefined;
+            if (
+              (toolCall.name === "execute_command" || toolCall.name === "shell") &&
+              typeof toolCall.arguments.command === "string"
+            ) {
+              const cmd = toolCall.arguments.command;
+              const result = checkCommand(cmd, settings, sessionAllowedBinaries);
+              if (!result.allowed && !result.reason?.startsWith("Matched deny pattern")) {
+                const binary = extractCommandBinary(cmd);
+                if (!DESTRUCTIVE_BINARIES.has(binary)) {
+                  sessionAllowBinary = binary;
+                }
+              }
+            }
+
+            setPendingConfirm({ toolCall, needsRootEscalation, sessionAllowBinary, resolve });
           });
         },
         onUsage: (usage: TokenUsage) => {
@@ -385,6 +412,15 @@ export function App({ agent, toolRegistry, provider, model, sshManager, audit, i
     (result: boolean | string) => {
       if (!pendingConfirm) return;
 
+      // Handle session-allow: add binary to allowed set, then approve
+      if (result === "__SESSION_ALLOW__" && pendingConfirm.sessionAllowBinary) {
+        sessionAllowedBinaries.add(pendingConfirm.sessionAllowBinary);
+        audit.log("session_allow", { binary: pendingConfirm.sessionAllowBinary });
+        pendingConfirm.resolve(true);
+        setPendingConfirm(null);
+        return;
+      }
+
       const approved = result === true;
       const isSudo = detectSudoInArgs(pendingConfirm.toolCall);
       const auditDetails = {
@@ -418,7 +454,7 @@ export function App({ agent, toolRegistry, provider, model, sshManager, audit, i
       pendingConfirm.resolve(result);
       setPendingConfirm(null);
     },
-    [pendingConfirm, enableRootMode, sshManager, audit],
+    [pendingConfirm, enableRootMode, sshManager, audit, sessionAllowedBinaries],
   );
 
   const handleSudoConfirm = useCallback(
@@ -491,6 +527,7 @@ export function App({ agent, toolRegistry, provider, model, sshManager, audit, i
           toolCall={pendingConfirm!.toolCall}
           isRoot={detectSudoInArgs(pendingConfirm!.toolCall)}
           needsRootEscalation={pendingConfirm!.needsRootEscalation}
+          sessionAllowBinary={pendingConfirm!.sessionAllowBinary}
           onConfirm={handleConfirm as (result: boolean | string) => void}
         />
       )}

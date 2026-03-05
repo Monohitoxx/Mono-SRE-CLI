@@ -27,7 +27,17 @@ export function isCommandAllowed(command: string, settings: Settings): boolean {
   return checkCommand(command, settings).allowed;
 }
 
-export function checkCommand(command: string, settings: Settings): CommandCheckResult {
+export function extractCommandBinary(command: string): string {
+  const normalized = command.trim().replace(/^\s*sudo\s+(-\S+\s+)*/, "").trim();
+  const binary = normalized.split(/\s+/)[0] || normalized;
+  return binary.includes("/") ? binary.split("/").pop()! : binary;
+}
+
+export function checkCommand(
+  command: string,
+  settings: Settings,
+  sessionAllowed?: Set<string>,
+): CommandCheckResult {
   const { allow, deny } = settings.commands;
   const raw = command.trim();
   const normalized = raw.replace(/^\s*sudo\s+(-\S+\s+)*/, "").trim();
@@ -57,7 +67,7 @@ export function checkCommand(command: string, settings: Settings): CommandCheckR
         seg.startsWith(`${pattern} `) ||
         binaryName === pattern ||
         binaryName.startsWith(`${pattern} `),
-    );
+    ) || (sessionAllowed?.has(binaryName) ?? false);
     if (!matched) {
       return {
         allowed: false,

@@ -62,8 +62,9 @@ async function main() {
     (envConfig as unknown as Record<string, unknown>).MODEL = cli.flags.model;
   }
 
+  const sessionAllowedBinaries = new Set<string>();
   const cmdCheck = (cmd: string): string | null => {
-    const result = checkCommand(cmd, settings);
+    const result = checkCommand(cmd, settings, sessionAllowedBinaries);
     return result.allowed ? null : (result.reason ?? "Command not allowed");
   };
 
@@ -118,6 +119,8 @@ async function main() {
       audit={audit}
       initialShowFlow={envConfig.SHOW_FLOW}
       planModeRef={planModeRef}
+      settings={settings}
+      sessionAllowedBinaries={sessionAllowedBinaries}
     />,
     { patchConsole: false },
   );

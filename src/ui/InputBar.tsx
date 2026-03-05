@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useRef, useCallback } from "react";
 import { Box, Text, useInput } from "ink";
 import { getCommands } from "../commands/index.js";
 
@@ -8,9 +8,15 @@ interface InputBarProps {
 }
 
 export const InputBar = React.memo(function InputBar({ onSubmit, isDisabled }: InputBarProps) {
-  const [value, setValue] = useState("");
-  const [cursor, setCursor] = useState(0);
+  // Use refs for immediate mutation (avoids stale closure on rapid paste)
+  const valueRef = useRef("");
+  const cursorRef = useRef(0);
+  const [, setTick] = useState(0);
+  const rerender = useCallback(() => setTick((t) => t + 1), []);
   const [suggestionIdx, setSuggestionIdx] = useState(0);
+
+  const value = valueRef.current;
+  const cursor = cursorRef.current;
 
   // Compute suggestions only when typing a bare slash command (no space yet)
   const isSlashIncomplete = value.startsWith("/") && !value.includes(" ");
@@ -28,12 +34,13 @@ export const InputBar = React.memo(function InputBar({ onSubmit, isDisabled }: I
       // If a suggestion is highlighted, complete and submit it
       const toSubmit = suggestions.length > 0
         ? `/${suggestions[suggestionIdx % suggestions.length].name}`
-        : value.trim();
+        : valueRef.current.trim();
       if (toSubmit) {
         onSubmit(toSubmit);
-        setValue("");
-        setCursor(0);
+        valueRef.current = "";
+        cursorRef.current = 0;
         setSuggestionIdx(0);
+        rerender();
       }
       return;
     }
@@ -57,63 +64,70 @@ export const InputBar = React.memo(function InputBar({ onSubmit, isDisabled }: I
     if (key.tab) {
       if (suggestions.length === 0) return;
       const completed = `/${suggestions[suggestionIdx % suggestions.length].name} `;
-      setValue(completed);
-      setCursor(completed.length);
+      valueRef.current = completed;
+      cursorRef.current = completed.length;
+      rerender();
       return;
     }
 
     if (key.backspace || key.delete) {
-      if (cursor > 0) {
-        setValue(value.slice(0, cursor - 1) + value.slice(cursor));
-        setCursor(cursor - 1);
+      if (cursorRef.current > 0) {
+        valueRef.current = valueRef.current.slice(0, cursorRef.current - 1) + valueRef.current.slice(cursorRef.current);
+        cursorRef.current--;
         setSuggestionIdx(0);
+        rerender();
       }
       return;
     }
 
     // Ctrl+D or Delete forward
     if (key.ctrl && input === "d") {
-      if (cursor < value.length) {
-        setValue(value.slice(0, cursor) + value.slice(cursor + 1));
+      if (cursorRef.current < valueRef.current.length) {
+        valueRef.current = valueRef.current.slice(0, cursorRef.current) + valueRef.current.slice(cursorRef.current + 1);
         setSuggestionIdx(0);
+        rerender();
       }
       return;
     }
 
     if (key.leftArrow) {
-      if (cursor > 0) setCursor(cursor - 1);
+      if (cursorRef.current > 0) { cursorRef.current--; rerender(); }
       return;
     }
 
     if (key.rightArrow) {
-      if (cursor < value.length) setCursor(cursor + 1);
+      if (cursorRef.current < valueRef.current.length) { cursorRef.current++; rerender(); }
       return;
     }
 
     // Home / Ctrl+A
     if (key.ctrl && input === "a") {
-      setCursor(0);
+      cursorRef.current = 0;
+      rerender();
       return;
     }
 
     // End / Ctrl+E
     if (key.ctrl && input === "e") {
-      setCursor(value.length);
+      cursorRef.current = valueRef.current.length;
+      rerender();
       return;
     }
 
     // Ctrl+U: clear line before cursor
     if (key.ctrl && input === "u") {
-      setValue(value.slice(cursor));
-      setCursor(0);
+      valueRef.current = valueRef.current.slice(cursorRef.current);
+      cursorRef.current = 0;
       setSuggestionIdx(0);
+      rerender();
       return;
     }
 
     // Ctrl+K: clear line after cursor
     if (key.ctrl && input === "k") {
-      setValue(value.slice(0, cursor));
+      valueRef.current = valueRef.current.slice(0, cursorRef.current);
       setSuggestionIdx(0);
+      rerender();
       return;
     }
 
@@ -126,9 +140,10 @@ export const InputBar = React.memo(function InputBar({ onSubmit, isDisabled }: I
     }
 
     if (!key.ctrl && !key.meta && input) {
-      setValue(value.slice(0, cursor) + input + value.slice(cursor));
-      setCursor(cursor + input.length);
+      valueRef.current = valueRef.current.slice(0, cursorRef.current) + input + valueRef.current.slice(cursorRef.current);
+      cursorRef.current += input.length;
       setSuggestionIdx(0);
+      rerender();
     }
   });
 

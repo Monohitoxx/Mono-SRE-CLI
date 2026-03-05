@@ -7,27 +7,48 @@ export interface ConfirmBarProps {
   toolCall: ToolCall;
   isRoot?: boolean;
   needsRootEscalation?: boolean;
+  sessionAllowBinary?: string;
   onConfirm: (result: boolean | string) => void;
+}
+
+interface ConfirmOption {
+  label: string;
+  color: string;
+  action: "approve" | "deny" | "session-allow" | "feedback";
 }
 
 // ─── Shared hook: option navigation + inline text input ──────────────────
 
-function useConfirmSelect(onConfirm: (result: boolean | string) => void) {
+function useConfirmSelect(
+  onConfirm: (result: boolean | string) => void,
+  options: ConfirmOption[],
+) {
   const [selectedIdx, setSelectedIdx] = useState(0);
   const [feedbackMode, setFeedbackMode] = useState(false);
   const [feedbackText, setFeedbackText] = useState("");
   const [feedbackCursor, setFeedbackCursor] = useState(0);
 
   const handleSelect = (idx: number) => {
-    if (idx === 0) {
-      onConfirm(true);
-    } else if (idx === 1) {
-      onConfirm(false);
-    } else {
-      setSelectedIdx(2);
-      setFeedbackMode(true);
+    const option = options[idx];
+    if (!option) return;
+    switch (option.action) {
+      case "approve":
+        onConfirm(true);
+        break;
+      case "deny":
+        onConfirm(false);
+        break;
+      case "session-allow":
+        onConfirm("__SESSION_ALLOW__");
+        break;
+      case "feedback":
+        setSelectedIdx(idx);
+        setFeedbackMode(true);
+        break;
     }
   };
+
+  const maxIdx = options.length - 1;
 
   useInput((input, key) => {
     if (feedbackMode) {
@@ -38,7 +59,6 @@ function useConfirmSelect(onConfirm: (result: boolean | string) => void) {
         setFeedbackMode(false);
         setFeedbackText("");
         setFeedbackCursor(0);
-        setSelectedIdx(2);
       } else if (key.backspace || key.delete) {
         if (feedbackCursor > 0) {
           setFeedbackText((t) => t.slice(0, feedbackCursor - 1) + t.slice(feedbackCursor));
@@ -58,15 +78,11 @@ function useConfirmSelect(onConfirm: (result: boolean | string) => void) {
     if (key.upArrow) {
       setSelectedIdx((prev) => Math.max(0, prev - 1));
     } else if (key.downArrow) {
-      setSelectedIdx((prev) => Math.min(2, prev + 1));
+      setSelectedIdx((prev) => Math.min(maxIdx, prev + 1));
     } else if (key.return) {
       handleSelect(selectedIdx);
-    } else if (input === "1") {
-      handleSelect(0);
-    } else if (input === "2") {
-      handleSelect(1);
-    } else if (input === "3") {
-      handleSelect(2);
+    } else if (input >= "1" && input <= String(options.length)) {
+      handleSelect(Number(input) - 1);
     }
   });
 
@@ -75,32 +91,31 @@ function useConfirmSelect(onConfirm: (result: boolean | string) => void) {
 
 // ─── Shared sub-components ────────────────────────────────────────────────
 
-const OPTION_LABELS = ["Yes", "No", "Add feedback for AI..."] as const;
-const OPTION_COLORS = ["green", "red", "yellow"] as const;
-
 function OptionList({
+  options,
   selectedIdx,
   feedbackMode,
   feedbackText,
   feedbackCursor,
 }: {
+  options: ConfirmOption[];
   selectedIdx: number;
   feedbackMode: boolean;
   feedbackText: string;
   feedbackCursor: number;
 }) {
+  const shortcuts = options.map((_, i) => String(i + 1)).join(" / ");
   return (
     <Box flexDirection="column" marginTop={1}>
-      {OPTION_LABELS.map((label, i) => {
+      {options.map((opt, i) => {
         const isSelected = i === selectedIdx;
-        const color = OPTION_COLORS[i];
         const cursor = isSelected && !feedbackMode ? "❯" : " ";
         return (
           <Box key={i} flexDirection="column">
-            <Text color={isSelected && !feedbackMode ? color : "gray"}>
-              {cursor} {i + 1}. {label}
+            <Text color={isSelected && !feedbackMode ? opt.color : "gray"}>
+              {cursor} {i + 1}. {opt.label}
             </Text>
-            {i === 2 && feedbackMode && (
+            {opt.action === "feedback" && feedbackMode && isSelected && (
               <Box marginLeft={3}>
                 <FeedbackInput text={feedbackText} cursor={feedbackCursor} />
               </Box>
@@ -112,7 +127,7 @@ function OptionList({
         {feedbackMode ? (
           <Text dimColor>Enter to send  ·  Esc to cancel</Text>
         ) : (
-          <Text dimColor>↑↓ navigate  ·  Enter select  ·  1 / 2 / 3 shortcut</Text>
+          <Text dimColor>{"↑↓ navigate  ·  Enter select  ·  "}{shortcuts}{" shortcut"}</Text>
         )}
       </Box>
     </Box>
@@ -202,6 +217,12 @@ function describeToolCall(toolCall: ToolCall): string {
 
 // ─── Plan confirm ─────────────────────────────────────────────────────────
 
+const PLAN_OPTIONS: ConfirmOption[] = [
+  { label: "Yes", color: "green", action: "approve" },
+  { label: "No", color: "red", action: "deny" },
+  { label: "Add feedback for AI...", color: "yellow", action: "feedback" },
+];
+
 function PlanConfirmBar({
   toolCall,
   onConfirm,
@@ -210,7 +231,7 @@ function PlanConfirmBar({
   onConfirm: (result: boolean | string) => void;
 }) {
   const { selectedIdx, feedbackMode, feedbackText, feedbackCursor } =
-    useConfirmSelect(onConfirm);
+    useConfirmSelect(onConfirm, PLAN_OPTIONS);
 
   const title =
     typeof toolCall.arguments.title === "string" && toolCall.arguments.title
@@ -260,6 +281,7 @@ function PlanConfirmBar({
         Approve this plan?
       </Text>
       <OptionList
+        options={PLAN_OPTIONS}
         selectedIdx={selectedIdx}
         feedbackMode={feedbackMode}
         feedbackText={feedbackText}
@@ -275,10 +297,24 @@ function ToolConfirmBar({
   toolCall,
   isRoot,
   needsRootEscalation,
+  sessionAllowBinary,
   onConfirm,
 }: ConfirmBarProps) {
+  const options: ConfirmOption[] = [
+    { label: "Yes", color: "green", action: "approve" },
+    { label: "No", color: "red", action: "deny" },
+  ];
+  if (sessionAllowBinary) {
+    options.push({
+      label: `Allow "${sessionAllowBinary}" this session`,
+      color: "cyan",
+      action: "session-allow",
+    });
+  }
+  options.push({ label: "Add feedback for AI...", color: "yellow", action: "feedback" });
+
   const { selectedIdx, feedbackMode, feedbackText, feedbackCursor } =
-    useConfirmSelect(onConfirm);
+    useConfirmSelect(onConfirm, options);
 
   const borderColor = isRoot ? "red" : "yellow";
   const headerColor = isRoot ? "red" : "yellow";
@@ -307,6 +343,7 @@ function ToolConfirmBar({
       </Text>
       <Text color="white">{describeToolCall(toolCall)}</Text>
       <OptionList
+        options={options}
         selectedIdx={selectedIdx}
         feedbackMode={feedbackMode}
         feedbackText={feedbackText}
