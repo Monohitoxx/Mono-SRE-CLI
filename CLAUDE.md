@@ -27,7 +27,7 @@ There is no test framework or lint config configured in this project.
 
 ## Architecture Overview
 
-**SRE CLI** is an AI-powered DevOps assistant with a React/Ink terminal UI, multi-provider LLM support, and SSH-based remote execution.
+**Mono CLI** is an AI-powered DevOps assistant with a React/Ink terminal UI, multi-provider LLM support, and SSH-based remote execution.
 
 ### Entry & Rendering
 
@@ -60,9 +60,9 @@ All tools extend `BaseTool` and define `name`, `description`, `parameters` (JSON
 | Web | `web_fetch`, `web_search` |
 | Memory | `memory` |
 
-### Configuration & Runtime Data (`.reason/`)
+### Configuration & Runtime Data (`.mono/`)
 
-The `.reason/` directory is the project config dir:
+The `.mono/` directory is the project config dir:
 - `settings.json` — command allow/deny lists, SSH defaults
 - `inventory.json` — host definitions (IP, port, credentials, tags)
 - `audit.jsonl` — append-only JSONL audit log (auto-redacts secrets)
@@ -81,7 +81,7 @@ React/Ink components rendered in the terminal: `ChatView`, `InputBar`, `ConfirmB
 
 ### Audit Logging (`src/utils/audit.ts`)
 
-Appends JSONL events to `.reason/audit.jsonl`. Events include `session_start/end`, `tool_call/result`, `tool_approved/denied`, `sudo_approved/denied`, `plan_approved`, `auto_sudo_upgrade`. Passwords and tokens are redacted.
+Appends JSONL events to `.mono/audit.jsonl`. Events include `session_start/end`, `tool_call/result`, `tool_approved/denied`, `sudo_approved/denied`, `plan_approved`, `auto_sudo_upgrade`. Passwords and tokens are redacted.
 
 ## Key Conventions
 

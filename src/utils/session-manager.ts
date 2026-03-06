@@ -4,7 +4,7 @@ import crypto from "node:crypto";
 import type { Message } from "../core/types.js";
 import type { ChatMessage } from "../ui/ChatView.js";
 
-const SESSIONS_DIR = path.join(process.cwd(), ".reason", "sessions");
+const SESSIONS_DIR = path.join(process.cwd(), ".mono", "sessions");
 
 // Only allow safe characters in session IDs (alphanumeric, dash, underscore)
 const SAFE_ID_RE = /^[a-zA-Z0-9_-]+$/;

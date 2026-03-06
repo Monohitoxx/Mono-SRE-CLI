@@ -18,16 +18,23 @@ interface AuditEntry {
   details: Record<string, unknown>;
 }
 
+export type AuditObserver = (entry: AuditEntry) => void;
+
 export class AuditLogger {
   readonly sessionId: string;
   private filePath: string;
+  private observers: AuditObserver[] = [];
 
-  constructor(baseDir: string = ".reason") {
+  constructor(baseDir: string = ".mono") {
     this.sessionId = randomUUID().slice(0, 8);
     if (!existsSync(baseDir)) {
       mkdirSync(baseDir, { recursive: true });
     }
     this.filePath = join(baseDir, "audit.jsonl");
+  }
+
+  addObserver(fn: AuditObserver): void {
+    this.observers.push(fn);
   }
 
   log(event: string, details: Record<string, unknown>): void {
@@ -39,6 +46,9 @@ export class AuditLogger {
         details: redactValue(details) as Record<string, unknown>,
       };
       appendFileSync(this.filePath, JSON.stringify(entry) + "\n");
+      for (const obs of this.observers) {
+        try { obs(entry); } catch { /* never crash */ }
+      }
     } catch {
       // Silent fail — never crash the CLI
     }

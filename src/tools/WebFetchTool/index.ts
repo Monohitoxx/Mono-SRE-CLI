@@ -54,7 +54,7 @@ Supports HTTP and HTTPS. Content is truncated to ${MAX_CONTENT_LENGTH} character
       const response = await fetch(url, {
         signal: controller.signal,
         headers: {
-          "User-Agent": "SRE-AI-CLI/1.0",
+          "User-Agent": "Mono-AI-CLI/1.0",
           Accept: "text/html,text/plain,application/json,*/*",
         },
       });

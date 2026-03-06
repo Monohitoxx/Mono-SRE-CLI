@@ -11,7 +11,7 @@ export const help: Command = {
       "  /clear  - Clear conversation",
       "  /root   - Toggle root mode (enable sudo)",
       "  /init   - Manage machine inventory (add/list/remove)",
-      "  /exit   - Exit SRE AI",
+      "  /exit   - Exit Mono AI",
       "  /help   - Show this help",
       "",
       `Root mode: ${ctx.rootModeRef.current ? "ENABLED" : "DISABLED"}`,

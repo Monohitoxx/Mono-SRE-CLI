@@ -1,4 +1,4 @@
-# SRE CLI 測試說明
+# Mono CLI 測試說明
 
 ## 目錄結構
 
@@ -35,7 +35,7 @@ npm test
 
 ### 真實 AI 測試（E2E）
 
-需要在 `.reason/.env` 設定好 API Key：
+需要在 `.mono/.env` 設定好 API Key：
 
 ```bash
 npm run test:e2e
@@ -132,7 +132,7 @@ Prompt Injection 的攻擊面在於 AI model 本身，而非代碼層：
 
 Gates 無法防禦的情況（超出本系統範圍）：
 - AI model 被注入後修改了**非工具操作**的回應內容（如輸出虛假診斷結果）
-- 攻擊者直接控制了 API key 或 `.reason/.env` 配置
+- 攻擊者直接控制了 API key 或 `.mono/.env` 配置
 
 ---
 

@@ -1,4 +1,4 @@
-# SRE AI
+# Mono AI
 
 AI-powered DevOps & Infrastructure CLI assistant with a React/Ink terminal UI, multi-provider LLM support, and SSH-based remote execution.
 
@@ -27,8 +27,8 @@ AI-powered DevOps & Infrastructure CLI assistant with a React/Ink terminal UI, m
 npm install
 
 # Configure environment
-cp .env.example .reason/.env
-# Edit .reason/.env with your provider, model, and API key
+cp .env.example .mono/.env
+# Edit .mono/.env with your provider, model, and API key
 
 # Build
 npm run build
@@ -78,14 +78,14 @@ npm run start
 ```bash
 npm run build
 npm link
-# Now available as: sre-ai
+# Now available as: mono-ai
 ```
 
 ## Configuration
 
-All configuration lives in the `.reason/` directory.
+All configuration lives in the `.mono/` directory.
 
-### Environment (`.reason/.env`)
+### Environment (`.mono/.env`)
 
 ```bash
 # Provider: openai | anthropic
@@ -107,11 +107,11 @@ See `.env.example` for all supported parameters.
 ### CLI Flags
 
 ```bash
-sre-ai --provider openai --model gpt-4o
-sre-ai -p anthropic -m claude-sonnet-4-20250514
+mono-ai --provider openai --model gpt-4o
+mono-ai -p anthropic -m claude-sonnet-4-20250514
 ```
 
-### Host Inventory (`.reason/inventory.json`)
+### Host Inventory (`.mono/inventory.json`)
 
 ```json
 {
@@ -128,11 +128,11 @@ sre-ai -p anthropic -m claude-sonnet-4-20250514
 }
 ```
 
-### Settings (`.reason/settings.json`)
+### Settings (`.mono/settings.json`)
 
 Command allow/deny lists and SSH defaults.
 
-### System Prompt Override (`.reason/reason`)
+### System Prompt Override (`.mono/reason`)
 
 Optional file to override the default system prompt.
 
@@ -248,7 +248,7 @@ src/
     ├── PlanProgress.tsx      # Plan execution tracker
     └── Spinner.tsx           # Loading indicator
 
-.reason/                     # Runtime config directory
+.mono/                     # Runtime config directory
 ├── .env                     # Environment variables
 ├── settings.json            # Command allow/deny, SSH defaults
 ├── inventory.json           # Host definitions
@@ -278,7 +278,7 @@ Enforced at agent, SSH, and UI layers:
 
 ## Security
 
-- **Audit trail** — all tool calls, approvals, and denials logged to `.reason/audit.jsonl`
+- **Audit trail** — all tool calls, approvals, and denials logged to `.mono/audit.jsonl`
 - **Secret redaction** — passwords, tokens, API keys automatically scrubbed from logs
 - **Command policy** — configurable allow/deny lists in `settings.json`
 - **Risk classification** — dangerous commands require plan approval

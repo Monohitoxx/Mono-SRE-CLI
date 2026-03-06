@@ -1,6 +1,6 @@
 node_modules/
 dist/
-.reason/.env
-.reason/inventory.json
-.reason/audit.jsonl
+.mono/.env
+.mono/inventory.json
+.mono/audit.jsonl
 *.tsbuildinfo

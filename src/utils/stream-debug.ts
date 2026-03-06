@@ -1,6 +1,6 @@
 import * as fs from "node:fs";
 import * as path from "node:path";
-import { getReasonDir } from "../config/env.js";
+import { getMonoDir } from "../config/env.js";
 
 let enabled = false;
 let logPath = "";
@@ -9,7 +9,7 @@ let seq = 0;
 export function initStreamDebug(enable: boolean) {
   enabled = enable;
   if (enabled) {
-    logPath = path.join(getReasonDir(), "stream-debug.log");
+    logPath = path.join(getMonoDir(), "stream-debug.log");
     try { fs.writeFileSync(logPath, ""); } catch {}
   }
 }

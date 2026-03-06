@@ -17,12 +17,41 @@ import {
   ServiceControlTool,
   RunHealthcheckTool,
 } from "./tools/RemoteTools/index.js";
+import {
+  GetServiceStatusTool,
+  RestartServiceTool,
+  GetSystemMetricsTool,
+  CheckPortTool,
+  GetLogsTool,
+  ManageFirewallRuleTool,
+  CheckDiskUsageTool,
+} from "./tools/InfraTools/index.js";
+import {
+  GetAlertsTool,
+  SilenceAlertTool,
+  QueryMetricsTool,
+  CheckUptimeTool,
+  GetIncidentTimelineTool,
+} from "./tools/MonitorTools/index.js";
 import { InventoryLookupTool } from "./tools/InventoryTool/index.js";
 import { InventoryAddTool, InventoryRemoveTool } from "./tools/InventoryTool/manage.js";
 import { PlanProgressTool } from "./tools/PlanTool/progress.js";
 import { SkillManager } from "./skills/manager.js";
 import { ActivateSkillTool } from "./tools/ActivateSkillTool/index.js";
 import { loadMemories } from "./tools/MemoryTool/index.js";
+import {
+  CollectInfraSnapshotTool,
+  QueryUserHabitsTool,
+  QueryInfraStateTool,
+} from "./tools/MemoryTools/index.js";
+import { initMemoryDb, closeMemoryDb } from "./memory/db.js";
+import { Layer2Collector } from "./memory/layer2-collector.js";
+import { Layer2Analyzer } from "./memory/layer2-analyzer.js";
+import { Layer3Collector } from "./memory/layer3-collector.js";
+import { Layer3Baseline } from "./memory/layer3-baseline.js";
+import { MemoryContextBuilder } from "./memory/context-builder.js";
+import { SubagentRunner } from "./subagent/runner.js";
+import { DelegateTaskTool } from "./tools/SubagentTool/index.js";
 import { initStreamDebug } from "./utils/stream-debug.js";
 import { saveSession, pruneOldSessions, generateSessionId } from "./utils/session-manager.js";
 import type { Message } from "./core/types.js";
@@ -31,7 +60,7 @@ import type { ChatMessage } from "./ui/ChatView.js";
 const cli = meow(
   `
   Usage
-    $ sre-ai
+    $ mono-ai
 
   Options
     --provider, -p  AI provider (openai/anthropic)
@@ -88,10 +117,37 @@ async function main() {
   toolRegistry.register(new WriteConfigTool(sshManager));
   toolRegistry.register(new ServiceControlTool(sshManager));
   toolRegistry.register(new RunHealthcheckTool(sshManager));
+  toolRegistry.register(new GetServiceStatusTool(sshManager));
+  toolRegistry.register(new RestartServiceTool(sshManager));
+  toolRegistry.register(new GetSystemMetricsTool(sshManager));
+  toolRegistry.register(new CheckPortTool(sshManager));
+  toolRegistry.register(new GetLogsTool(sshManager));
+  toolRegistry.register(new ManageFirewallRuleTool(sshManager));
+  toolRegistry.register(new CheckDiskUsageTool(sshManager));
+  toolRegistry.register(new GetAlertsTool(sshManager));
+  toolRegistry.register(new SilenceAlertTool(sshManager));
+  toolRegistry.register(new QueryMetricsTool(sshManager));
+  toolRegistry.register(new CheckUptimeTool(sshManager));
+  toolRegistry.register(new GetIncidentTimelineTool(sshManager));
   toolRegistry.register(new InventoryLookupTool());
   toolRegistry.register(new InventoryAddTool());
   toolRegistry.register(new InventoryRemoveTool());
   toolRegistry.register(new PlanProgressTool());
+
+  // Memory system
+  const memoryDb = initMemoryDb();
+  const layer2Collector = new Layer2Collector(memoryDb, audit.sessionId);
+  layer2Collector.attach(audit);
+  const layer3Collector = new Layer3Collector(memoryDb, sshManager);
+  const contextBuilder = new MemoryContextBuilder(memoryDb);
+
+  toolRegistry.register(new CollectInfraSnapshotTool(layer3Collector));
+  toolRegistry.register(new QueryUserHabitsTool(memoryDb));
+  toolRegistry.register(new QueryInfraStateTool(memoryDb));
+
+  // Subagent system
+  const subagentRunner = new SubagentRunner(provider, toolRegistry, audit);
+  toolRegistry.register(new DelegateTaskTool(subagentRunner));
 
   const skillManager = new SkillManager();
   await skillManager.loadAll();
@@ -106,6 +162,8 @@ async function main() {
     const skillCatalog = skillManager.getSkillCatalogPrompt();
     if (skillCatalog) parts.push(skillCatalog);
     if (memories) parts.push(`## Saved Memories\n${memories}`);
+    const memCtx = contextBuilder.buildContext({ currentHour: new Date().getHours() });
+    if (memCtx) parts.push(memCtx);
     return parts.join("\n\n");
   }, envConfig.CONTEXT_LIMIT);
   agent.setAuditLogger(audit);
@@ -145,6 +203,26 @@ async function main() {
     pruneOldSessions(20);
   }
 
+  // Session-end analysis
+  try {
+    const analyzer = new Layer2Analyzer(memoryDb);
+    analyzer.analyzeWorkflows();
+    analyzer.updatePreferences();
+
+    // Compute baselines for hosts that were operated on in this session
+    const baseline = new Layer3Baseline(memoryDb);
+    const operatedHosts = memoryDb.prepare(
+      `SELECT DISTINCT target_host FROM user_actions WHERE session_id = ? AND target_host IS NOT NULL AND target_host NOT LIKE 'tags:%'`
+    ).all(audit.sessionId) as { target_host: string }[];
+
+    for (const { target_host } of operatedHosts) {
+      baseline.computeBaselines(target_host);
+    }
+  } catch {
+    // Best effort — never block exit
+  }
+
+  closeMemoryDb(memoryDb);
   audit.log("session_end", { durationMs: Date.now() - startTime });
   sshManager.disconnectAll();
   process.exit(0);

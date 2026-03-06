@@ -1,13 +1,15 @@
 import type { AIProvider } from "../providers/base.js";
 import type { Message } from "./types.js";
 
-const COMPACT_SYSTEM_PROMPT = `You are a conversation summarizer for an SRE CLI assistant.
+const COMPACT_SYSTEM_PROMPT = `You are a conversation summarizer for a Mono assistant.
 Summarize the following conversation concisely, preserving:
 - All server/host names, IPs, ports, and connection details
 - Commands executed and their key outcomes (success/failure/errors)
 - Current task status and any pending actions
 - Important decisions made and user preferences
 - Error messages encountered and their resolutions
+- Security decisions: any tool calls the user DENIED or that were BLOCKED by policy (include the tool name, reason, and outcome)
+- Sudo escalation state: which binaries were granted sudo escalation during this session
 
 Output ONLY the summary. No preamble, no "Here is the summary" header.`;
 

@@ -11,7 +11,7 @@ export default defineConfig({
   banner: {
     js: '#!/usr/bin/env node',
   },
-  external: ["react", "ink", "yoga-layout"],
+  external: ["react", "ink", "yoga-layout", "better-sqlite3"],
   noExternal: [],
   esbuildOptions(options) {
     options.jsx = "automatic";

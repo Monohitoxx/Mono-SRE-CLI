@@ -5,11 +5,11 @@ import * as os from "node:os";
 import { BaseTool } from "../base.js";
 import type { ToolResult } from "../../core/types.js";
 
-const MEMORY_SECTION = "## SRE AI Memories";
+const MEMORY_SECTION = "## Mono AI Memories";
 
 function getMemoryPath(): string {
-  const localPath = path.join(process.cwd(), ".reason", "memory.md");
-  const homePath = path.join(os.homedir(), ".reason", "memory.md");
+  const localPath = path.join(process.cwd(), ".mono", "memory.md");
+  const homePath = path.join(os.homedir(), ".mono", "memory.md");
 
   try {
     fsSync.accessSync(path.dirname(localPath));
@@ -103,8 +103,8 @@ Each fact should be a clear, self-contained statement.`;
 
 export async function loadMemories(): Promise<string> {
   const paths = [
-    path.join(process.cwd(), ".reason", "memory.md"),
-    path.join(os.homedir(), ".reason", "memory.md"),
+    path.join(process.cwd(), ".mono", "memory.md"),
+    path.join(os.homedir(), ".mono", "memory.md"),
   ];
 
   const memories: string[] = [];

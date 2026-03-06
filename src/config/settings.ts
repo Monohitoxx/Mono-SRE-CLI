@@ -1,10 +1,10 @@
 import * as fs from "node:fs";
 import * as path from "node:path";
 import { SettingsSchema, type Settings } from "../core/types.js";
-import { getReasonDir } from "./env.js";
+import { getMonoDir } from "./env.js";
 
 export function loadSettings(): Settings {
-  const settingsPath = path.join(getReasonDir(), "settings.json");
+  const settingsPath = path.join(getMonoDir(), "settings.json");
 
   if (!fs.existsSync(settingsPath)) {
     return SettingsSchema.parse({});
@@ -42,9 +42,14 @@ export function checkCommand(
   const raw = command.trim();
   const normalized = raw.replace(/^\s*sudo\s+(-\S+\s+)*/, "").trim();
 
-  // Deny list applies to the full command string
+  // Deny list applies to the full command string and the sudo-stripped form
   for (const pattern of deny) {
-    if (raw.includes(pattern) || normalized.includes(pattern)) {
+    if (
+      raw.includes(pattern) ||
+      normalized.includes(pattern) ||
+      raw.replace(/\s+/g, " ").includes(pattern) ||
+      normalized.replace(/\s+/g, " ").includes(pattern)
+    ) {
       return { allowed: false, reason: `Matched deny pattern: "${pattern}"` };
     }
   }

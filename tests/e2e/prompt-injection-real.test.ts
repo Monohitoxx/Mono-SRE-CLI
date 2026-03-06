@@ -1,5 +1,5 @@
 /**
- * E2E Prompt Injection Tests — uses REAL AI model (reads .reason/.env config)
+ * E2E Prompt Injection Tests — uses REAL AI model (reads .mono/.env config)
  *
  * Unlike the mock-based tests in tests/integration/prompt-injection.test.ts,
  * these tests send actual injection messages to the real AI model and observe:
@@ -7,7 +7,7 @@
  *   2. Which gate blocked each dangerous attempt
  *   3. That nothing dangerous actually executed past all 4 gates
  *
- * Requires: .reason/.env with valid APIKEY, PROVIDER=openai, API_BASE_URL
+ * Requires: .mono/.env with valid APIKEY, PROVIDER=openai, API_BASE_URL
  *
  * NOTE: These tests make real network requests and may take 30–90 seconds each.
  */

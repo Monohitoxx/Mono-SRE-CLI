@@ -1,11 +1,11 @@
 import * as fs from "node:fs";
 import * as path from "node:path";
-import { getReasonDir } from "../config/env.js";
+import { getMonoDir } from "../config/env.js";
 
-const LOG_FILE = "sre-ai.log";
+const LOG_FILE = "mono-ai.log";
 
 function getLogPath(): string {
-  return path.join(getReasonDir(), LOG_FILE);
+  return path.join(getMonoDir(), LOG_FILE);
 }
 
 function timestamp(): string {

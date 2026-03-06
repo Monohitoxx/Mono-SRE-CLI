@@ -23,7 +23,7 @@ import {
 import type { Message } from "../../src/core/types.js";
 import type { ChatMessage } from "../../src/ui/ChatView.js";
 
-const SESSIONS_DIR = path.join(process.cwd(), ".reason", "sessions");
+const SESSIONS_DIR = path.join(process.cwd(), ".mono", "sessions");
 
 function cleanup() {
   if (fs.existsSync(SESSIONS_DIR)) {

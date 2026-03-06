@@ -31,7 +31,7 @@ export function Header({ provider, model, version = "0.1.0" }: HeaderProps) {
       >
         <Box flexDirection="row" gap={2}>
           <Text bold color="cyan">
-            SRE AI
+            Mono AI
           </Text>
           <Text dimColor>v{version}</Text>
           <Text dimColor>|</Text>

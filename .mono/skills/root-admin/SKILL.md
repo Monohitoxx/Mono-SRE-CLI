@@ -59,7 +59,7 @@ Use `read_config` / `write_config` — do NOT use `execute_command` with cat/tee
 
 ### Safety Rules
 - Modifying operations MUST use an approved plan (the system enforces this)
-- Run ONE command per `execute_command` call — no `&&`, `||`, `;`, or `|` chaining
+- Run ONE command per `execute_command` call — no `&&`, `||`, or `;` chaining. Pipes (`|`) for filtering output are OK (e.g. `ps aux | grep nginx`).
 - NEVER run commands that could brick the system (overwrite boot, delete /)
 - `write_config` creates backups automatically
 - Verify changes after applying them

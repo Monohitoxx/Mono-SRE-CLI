@@ -35,7 +35,7 @@ export const StatusBar = React.memo(function StatusBar({
     >
       <Box gap={2}>
         <Text bold color="cyan">
-          SRE AI
+          Mono AI
         </Text>
         <Text dimColor>
           {provider}/{model}

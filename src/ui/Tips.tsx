@@ -1,13 +1,13 @@
 import React, { useState, useEffect } from "react";
 import { Box, Text } from "ink";
 
-const SRE_TIPS = [
+const MONO_TIPS = [
   "Use /help to see all available commands",
-  "Create SKILL.md files in .reason/skills/ to add custom workflows",
-  "Configure allowed commands in .reason/settings.json",
+  "Create SKILL.md files in .mono/skills/ to add custom workflows",
+  "Configure allowed commands in .mono/settings.json",
   "Run remote operations by targeting host, hosts, or tags from inventory",
   "Use /clear to start a fresh conversation",
-  "Change AI models by editing .reason/.env (PROVIDER & MODEL)",
+  "Change AI models by editing .mono/.env (PROVIDER & MODEL)",
   "I can run kubectl, docker, and systemctl commands for you",
   "Ask me to check disk space, memory, or CPU on remote servers",
   "I follow the allow/deny list in settings.json for safety",
@@ -21,7 +21,7 @@ const SRE_TIPS = [
 
 export function Tips() {
   const [tip] = useState(
-    () => SRE_TIPS[Math.floor(Math.random() * SRE_TIPS.length)],
+    () => MONO_TIPS[Math.floor(Math.random() * MONO_TIPS.length)],
   );
 
   return (
@@ -50,12 +50,12 @@ export function Tips() {
 
 export function LoadingTip() {
   const [tipIndex, setTipIndex] = useState(
-    () => Math.floor(Math.random() * SRE_TIPS.length),
+    () => Math.floor(Math.random() * MONO_TIPS.length),
   );
 
   useEffect(() => {
     const interval = setInterval(() => {
-      setTipIndex((prev) => (prev + 1) % SRE_TIPS.length);
+      setTipIndex((prev) => (prev + 1) % MONO_TIPS.length);
     }, 8000);
     return () => clearInterval(interval);
   }, []);
@@ -63,7 +63,7 @@ export function LoadingTip() {
   return (
     <Text color="gray" dimColor>
       {"💡 "}
-      {SRE_TIPS[tipIndex]}
+      {MONO_TIPS[tipIndex]}
     </Text>
   );
 }

@@ -3,26 +3,26 @@ import * as path from "node:path";
 import { config as dotenvConfig } from "dotenv";
 import { EnvConfigSchema, type EnvConfig } from "../core/types.js";
 
-function findReasonDir(): string {
-  const localReason = path.resolve(process.cwd(), ".reason");
-  if (fs.existsSync(localReason)) return localReason;
+function findMonoDir(): string {
+  const localMono = path.resolve(process.cwd(), ".mono");
+  if (fs.existsSync(localMono)) return localMono;
 
-  const homeReason = path.resolve(
+  const homeMono = path.resolve(
     process.env.HOME || process.env.USERPROFILE || "~",
-    ".reason",
+    ".mono",
   );
-  if (fs.existsSync(homeReason)) return homeReason;
+  if (fs.existsSync(homeMono)) return homeMono;
 
-  return localReason;
+  return localMono;
 }
 
-export function getReasonDir(): string {
-  return findReasonDir();
+export function getMonoDir(): string {
+  return findMonoDir();
 }
 
 export function loadEnvConfig(): EnvConfig {
-  const reasonDir = findReasonDir();
-  const envPath = path.join(reasonDir, ".env");
+  const monoDir = findMonoDir();
+  const envPath = path.join(monoDir, ".env");
 
   if (fs.existsSync(envPath)) {
     dotenvConfig({ path: envPath });

@@ -1,6 +1,6 @@
 import * as fs from "node:fs";
 import * as path from "node:path";
-import { getReasonDir } from "./env.js";
+import { getMonoDir } from "./env.js";
 
 // ─── Types ───────────────────────────────────────────────────────────────
 
@@ -27,7 +27,7 @@ export interface HostEntry {
 // ─── File I/O ────────────────────────────────────────────────────────────
 
 function getInventoryPath(): string {
-  return path.join(getReasonDir(), "inventory.json");
+  return path.join(getMonoDir(), "inventory.json");
 }
 
 export function loadInventory(): Inventory {

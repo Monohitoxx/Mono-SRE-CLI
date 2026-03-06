@@ -142,6 +142,23 @@ const PLAN_EXEMPT_TOOLS = new Set([
   "inventory_add",
   "inventory_remove",
   "activate_skill",
+  // Infra read-only tools
+  "get_service_status",
+  "get_system_metrics",
+  "check_port",
+  "get_logs",
+  "check_disk_usage",
+  // Monitor read-only tools
+  "get_alerts",
+  "query_metrics",
+  "check_uptime",
+  "get_incident_timeline",
+  // Memory tools
+  "collect_infra_snapshot",
+  "query_user_habits",
+  "query_infra_state",
+  // Subagent
+  "delegate_task",
 ]);
 
 // ─── Public API ───────────────────────────────────────────────────────────
@@ -164,6 +181,37 @@ export function classifyToolCallRisk(
       level: "plan-required",
       reason: `service lifecycle: ${action}`,
       matchedPatterns: ["service-lifecycle"],
+    };
+  }
+
+  // ─── silence_alert: always plan-required ──────────────────────────────
+  if (toolName === "silence_alert") {
+    return {
+      level: "plan-required",
+      reason: "alert silence modification",
+      matchedPatterns: ["monitoring"],
+    };
+  }
+
+  // ─── restart_service: always plan-required ────────────────────────────
+  if (toolName === "restart_service") {
+    return {
+      level: "plan-required",
+      reason: "service restart",
+      matchedPatterns: ["service-lifecycle"],
+    };
+  }
+
+  // ─── manage_firewall_rule: plan-required for mutating actions ────────
+  if (toolName === "manage_firewall_rule") {
+    const action = typeof args.action === "string" ? args.action : "";
+    if (action === "status") {
+      return { level: "read-only", reason: "firewall status check", matchedPatterns: [] };
+    }
+    return {
+      level: "plan-required",
+      reason: `firewall modification: ${action}`,
+      matchedPatterns: ["firewall"],
     };
   }
 

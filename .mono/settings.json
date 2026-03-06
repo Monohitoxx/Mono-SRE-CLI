@@ -21,13 +21,23 @@
     ],
     "deny": [
       "rm -rf /",
+      "rm -rf /*",
+      "rm -rf .",
       "shutdown",
+      "poweroff",
+      "halt",
+      "init 0",
+      "init 6",
       "reboot",
       "mkfs",
       "dd if=",
-      "> /dev/sda",
+      "> /dev/sd",
+      "> /dev/nvme",
+      "> /dev/vd",
       "chmod -R 777 /",
-      ":(){ :|:& };:"
+      ":(){ :|:& };:",
+      ".(){",
+      "fork bomb"
     ]
   },
   "ssh": {

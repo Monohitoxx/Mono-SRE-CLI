@@ -1,15 +1,15 @@
 import * as path from "node:path";
 import type { SkillDefinition } from "../core/types.js";
 import { loadSkillsFromDirectory } from "./loader.js";
-import { getReasonDir } from "../config/env.js";
+import { getMonoDir } from "../config/env.js";
 
 export class SkillManager {
   private skills = new Map<string, SkillDefinition>();
   private activeSkills = new Set<string>();
 
   async loadAll(): Promise<void> {
-    const reasonDir = getReasonDir();
-    const skillsDir = path.join(reasonDir, "skills");
+    const monoDir = getMonoDir();
+    const skillsDir = path.join(monoDir, "skills");
     const loaded = await loadSkillsFromDirectory(skillsDir);
 
     for (const skill of loaded) {

@@ -18,7 +18,7 @@ const USAGE = [
   "  /init list",
   "  /init remove hk01",
   "",
-  "Tags, role, and services can be edited in .reason/inventory.json directly.",
+  "Tags, role, and services can be edited in .mono/inventory.json directly.",
 ].join("\n");
 
 export const init: Command = {

@@ -1,10 +1,27 @@
 /**
- * Extract the binary name from a command string.
- * Example: "docker ps -a" -> "docker"
+ * Extract the binary key from a command string for sudo escalation tracking.
+ * For commands with subcommands (docker, kubectl, systemctl, etc.),
+ * includes the subcommand so that e.g. "docker ps" permission errors
+ * don't auto-escalate "docker rm".
+ * Example: "docker ps -a" -> "docker:ps", "ls -la" -> "ls"
  */
+const MULTI_SUBCOMMAND_BINARIES = new Set([
+  "docker", "kubectl", "helm", "systemctl", "service",
+  "apt", "apt-get", "dnf", "yum", "apk", "pip", "pip3", "npm",
+  "ip", "nmcli", "ufw", "iptables", "firewall-cmd",
+]);
+
 export function extractBinary(cmd: string): string {
-  const first = cmd.trim().split(/\s+/)[0];
-  return first || cmd;
+  const tokens = cmd.trim().split(/\s+/);
+  const binary = tokens[0] || cmd;
+  if (MULTI_SUBCOMMAND_BINARIES.has(binary) && tokens.length > 1) {
+    const sub = tokens[1];
+    // Skip flags like -v, --help as subcommands
+    if (sub && !sub.startsWith("-")) {
+      return `${binary}:${sub}`;
+    }
+  }
+  return binary;
 }
 
 export function stripLeadingSudo(cmd: string): string {
