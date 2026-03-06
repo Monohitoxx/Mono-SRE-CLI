@@ -192,7 +192,7 @@ async function main() {
       sessionAllowedBinaries={sessionAllowedBinaries}
       onSaveAndExit={handleSaveAndExit}
     />,
-    { patchConsole: false },
+    { patchConsole: false, exitOnCtrlC: false },
   );
 
   await waitUntilExit();
