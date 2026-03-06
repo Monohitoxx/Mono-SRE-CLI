@@ -1,7 +1,7 @@
 {
   "name": "mono-ai",
   "version": "0.1.0",
-  "description": "Mono AI - DevOps & Infrastructure CLI powered by AI",
+  "description": "Mono - DevOps & Infrastructure CLI powered by AI",
   "type": "module",
   "bin": {
     "mono-ai": "./dist/cli.js"

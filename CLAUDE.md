@@ -27,7 +27,7 @@ There is no test framework or lint config configured in this project.
 
 ## Architecture Overview
 
-**Mono CLI** is an AI-powered DevOps assistant with a React/Ink terminal UI, multi-provider LLM support, and SSH-based remote execution.
+**Mono** is an AI-powered DevOps assistant with a React/Ink terminal UI, multi-provider LLM support, and SSH-based remote execution.
 
 ### Entry & Rendering
 

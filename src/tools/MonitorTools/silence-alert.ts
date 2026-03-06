@@ -83,7 +83,7 @@ export class SilenceAlertTool extends BaseTool {
 
       const command = [
         `if command -v amtool >/dev/null 2>&1; then`,
-        `  amtool silence add ${shellQuote(matcher)} --duration=${shellQuote(duration)} --comment=${shellQuote("Silenced via Mono AI")} 2>&1`,
+        `  amtool silence add ${shellQuote(matcher)} --duration=${shellQuote(duration)} --comment=${shellQuote("Silenced via Mono")} 2>&1`,
         `else`,
         `  echo "amtool not found. Install alertmanager to manage silences, or use the Alertmanager API directly."`,
         `fi`,

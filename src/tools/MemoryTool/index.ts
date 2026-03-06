@@ -5,7 +5,7 @@ import * as os from "node:os";
 import { BaseTool } from "../base.js";
 import type { ToolResult } from "../../core/types.js";
 
-const MEMORY_SECTION = "## Mono AI Memories";
+const MEMORY_SECTION = "## Mono Memories";
 
 function getMemoryPath(): string {
   const localPath = path.join(process.cwd(), ".mono", "memory.md");
