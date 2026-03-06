@@ -57,14 +57,16 @@ export function App({ agent, toolRegistry, provider, model, sshManager, audit, i
   const reasoningRef = useRef("");
   const rootModeRef = useRef(false);
   const loadingStartRef = useRef<number>(0);
+  const messagesRef = useRef<ChatMessage[]>([]);
+  messagesRef.current = messages;
 
   const [pendingResume, setPendingResume] = useState<SessionInfo[] | null>(null);
 
   const handleExit = useCallback(() => {
     const conversationMsgs = agent.getHistory();
-    onSaveAndExit(conversationMsgs, messages);
+    onSaveAndExit(conversationMsgs, messagesRef.current);
     exit();
-  }, [agent, messages, onSaveAndExit, exit]);
+  }, [agent, onSaveAndExit, exit]);
 
   const handleResumeSelect = useCallback((sessionId: string) => {
     const session = loadSession(sessionId);
@@ -484,7 +486,7 @@ export function App({ agent, toolRegistry, provider, model, sshManager, audit, i
         },
       });
     },
-    [agent, exit, toolRegistry],
+    [agent, exit, toolRegistry, handleExit],
   );
 
   const handleConfirm = useCallback(
