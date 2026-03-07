@@ -1,6 +1,5 @@
 import React, { useState, useCallback, useRef, useEffect } from "react";
-import { Box, Static, useApp, useInput } from "ink";
-import { Header } from "./ui/Header.js";
+import { Box, useApp, useInput } from "ink";
 import { StatusBar } from "./ui/StatusBar.js";
 import { ChatView, type ChatMessage } from "./ui/ChatView.js";
 import { InputBar } from "./ui/InputBar.js";
@@ -571,9 +570,6 @@ export function App({ agent, toolRegistry, provider, model, sshManager, audit, i
 
   return (
     <Box flexDirection="column" height="100%">
-      <Static items={["header"] as const}>
-        {() => <Header key="header" provider={provider} model={model} />}
-      </Static>
       <StatusBar
         provider={provider}
         model={model}
