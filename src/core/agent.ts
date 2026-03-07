@@ -14,6 +14,9 @@ import {
 } from "./command-policy-utils.js";
 import { sd } from "../utils/stream-debug.js";
 import { generateCompactSummary, shouldAutoCompact } from "./compactor.js";
+import { classifyQuery, type QueryComplexity } from "./query-classifier.js";
+import type { ChatOptions } from "../providers/base.js";
+import type { PromptComplexity } from "../config/prompt.js";
 
 export interface AgentCallbacks {
   onTextDelta: (text: string) => void;
@@ -49,7 +52,7 @@ export class Agent {
   constructor(
     provider: AIProvider,
     toolRegistry: ToolRegistry,
-    systemPrompt: string | (() => string),
+    systemPrompt: string | ((complexity?: PromptComplexity) => string),
     contextLimit?: number,
   ) {
     this.provider = provider;
@@ -76,9 +79,13 @@ export class Agent {
     this.planCompletedSteps.clear();
     this.policyBlockCircuit.resetTurnGuards();
 
+    // Classify query complexity for token optimization
+    const complexity = classifyQuery(userMessage);
+    sd("AGENT QUERY_CLASSIFY", { complexity, msgLen: userMessage.length });
+
     try {
       this.conversation.addUser(userMessage);
-      await this.agentLoop(callbacks);
+      await this.agentLoop(callbacks, complexity);
     } catch (err) {
       callbacks.onError((err as Error).message);
     } finally {
@@ -86,24 +93,37 @@ export class Agent {
     }
   }
 
-  private async agentLoop(callbacks: AgentCallbacks): Promise<void> {
+  private async agentLoop(callbacks: AgentCallbacks, complexity: QueryComplexity = "complex"): Promise<void> {
+    const SIMPLE_ITERATIONS = 3;
     const BASE_ITERATIONS = 20;
     const PLAN_ITERATIONS = 60;
 
-    for (let i = 0; i < (this.planApprovedForTurn ? PLAN_ITERATIONS : BASE_ITERATIONS); i++) {
+    // Simple queries: fewer iterations, lower max_tokens, skip tools on first iteration
+    const maxIter = this.planApprovedForTurn
+      ? PLAN_ITERATIONS
+      : complexity === "simple" ? SIMPLE_ITERATIONS : BASE_ITERATIONS;
+
+    const chatOptions: ChatOptions | undefined = complexity === "simple"
+      ? { maxTokensOverride: 1024 }
+      : undefined;
+
+    for (let i = 0; i < maxIter; i++) {
       // ─── Auto-compact when approaching context limit ─────────────
       if (this.lastInputTokens > 0 && shouldAutoCompact(this.lastInputTokens, this.contextLimit)) {
         sd("AGENT AUTO_COMPACT", { lastInputTokens: this.lastInputTokens, contextLimit: this.contextLimit });
         await this.compactConversation(callbacks);
       }
 
-      const messages = this.conversation.getMessages();
-      const tools = this.toolRegistry.getDefinitions();
+      const messages = this.conversation.getMessages(complexity === "simple" && i === 0 ? "simple" : "complex");
+      // For simple queries on first iteration, don't send tool definitions to avoid tool-calling overhead
+      const tools = (complexity === "simple" && i === 0)
+        ? undefined
+        : this.toolRegistry.getDefinitions();
 
       let assistantText = "";
       const pendingToolCalls: ToolCall[] = [];
 
-      const stream = this.provider.chat(messages, tools);
+      const stream = this.provider.chat(messages, tools, chatOptions);
 
       for await (const event of stream) {
         switch (event.type) {

@@ -1,10 +1,11 @@
 import type { Message } from "./types.js";
+import type { PromptComplexity } from "../config/prompt.js";
 
 export class Conversation {
   private messages: Message[] = [];
-  private getSystemPrompt: () => string;
+  private getSystemPrompt: (complexity?: PromptComplexity) => string;
 
-  constructor(systemPrompt: string | (() => string)) {
+  constructor(systemPrompt: string | ((complexity?: PromptComplexity) => string)) {
     this.getSystemPrompt =
       typeof systemPrompt === "function" ? systemPrompt : () => systemPrompt;
   }
@@ -25,9 +26,9 @@ export class Conversation {
     });
   }
 
-  getMessages(): Message[] {
+  getMessages(complexity?: PromptComplexity): Message[] {
     return [
-      { role: "system", content: this.getSystemPrompt() },
+      { role: "system", content: this.getSystemPrompt(complexity) },
       ...this.messages,
     ];
   }
