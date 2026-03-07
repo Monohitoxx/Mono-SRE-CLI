@@ -55,6 +55,11 @@ import { Layer3Baseline } from "./memory/layer3-baseline.js";
 import { MemoryContextBuilder } from "./memory/context-builder.js";
 import { SubagentRunner } from "./subagent/runner.js";
 import { DelegateTaskTool } from "./tools/SubagentTool/index.js";
+import {
+  RdpConnectTool,
+  PuttyCommandTool,
+  RdpDisconnectTool,
+} from "./tools/RdpTools/index.js";
 import { initStreamDebug } from "./utils/stream-debug.js";
 import { saveSession, pruneOldSessions, generateSessionId } from "./utils/session-manager.js";
 import type { Message } from "./core/types.js";
@@ -162,6 +167,11 @@ async function main() {
   toolRegistry.register(new QueryMetricsTool(sshManager));
   toolRegistry.register(new CheckUptimeTool(sshManager));
   toolRegistry.register(new GetIncidentTimelineTool(sshManager));
+  // RDP + PuTTY automation (PAM/CyberArk workflow)
+  toolRegistry.register(new RdpConnectTool());
+  toolRegistry.register(new PuttyCommandTool());
+  toolRegistry.register(new RdpDisconnectTool());
+
   toolRegistry.register(new InventoryLookupTool());
   toolRegistry.register(new InventoryAddTool());
   toolRegistry.register(new InventoryRemoveTool());
