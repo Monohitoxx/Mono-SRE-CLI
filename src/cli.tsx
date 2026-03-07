@@ -188,8 +188,10 @@ async function main() {
 
   const memories = await loadMemories();
 
-  const agent = new Agent(provider, toolRegistry, () => {
-    const base = loadSystemPrompt(envConfig.MODEL);
+  const agent = new Agent(provider, toolRegistry, (complexity) => {
+    const base = loadSystemPrompt(envConfig.MODEL, complexity);
+    // Simple queries get minimal prompt — skip extras
+    if (complexity === "simple") return base;
     const parts = [base];
     if (planModeRef.current) parts.push(PLAN_MODE_RULES);
     const skillCatalog = skillManager.getSkillCatalogPrompt();

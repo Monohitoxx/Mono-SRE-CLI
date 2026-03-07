@@ -211,19 +211,9 @@ export function formatInventoryHint(): string {
     if (host.role) allRoles.add(host.role);
   }
 
-  return [
-    "",
-    "## Machine Inventory",
-    `${hostNames.length} host(s) configured: ${hostNames.join(", ")}`,
-    allTags.size > 0 ? `Tags: ${[...allTags].join(", ")}` : "",
-    allServices.size > 0 ? `Services: ${[...allServices].join(", ")}` : "",
-    allRoles.size > 0 ? `Roles: ${[...allRoles].join(", ")}` : "",
-    "",
-    "Use the remote tools (execute_command, read_config, write_config, service_control, run_healthcheck) to operate on hosts.",
-    "Each tool accepts `host` (single name), `hosts` (array), or `tags` (array, AND logic) for targeting.",
-    "Use inventory_lookup to browse available hosts before operating.",
-    "Example: service_control({ tags: ['hk', 'prod'], service: 'unbound', action: 'reload' })",
-  ]
-    .filter(Boolean)
-    .join("\n");
+  const parts = [`\n## Inventory: ${hostNames.length} host(s) — ${hostNames.join(", ")}`];
+  if (allTags.size > 0) parts.push(`Tags: ${[...allTags].join(", ")}`);
+  if (allServices.size > 0) parts.push(`Services: ${[...allServices].join(", ")}`);
+  if (allRoles.size > 0) parts.push(`Roles: ${[...allRoles].join(", ")}`);
+  return parts.join(". ");
 }

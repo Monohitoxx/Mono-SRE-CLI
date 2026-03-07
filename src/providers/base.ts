@@ -5,6 +5,11 @@ import type {
   EnvConfig,
 } from "../core/types.js";
 
+export interface ChatOptions {
+  /** Override max_tokens for this request (e.g. lower for simple queries) */
+  maxTokensOverride?: number;
+}
+
 export interface AIProvider {
   readonly name: string;
   readonly model: string;
@@ -12,6 +17,7 @@ export interface AIProvider {
   chat(
     messages: Message[],
     tools?: ToolDefinition[],
+    options?: ChatOptions,
   ): AsyncIterable<StreamEvent>;
 
   supportsTools(): boolean;

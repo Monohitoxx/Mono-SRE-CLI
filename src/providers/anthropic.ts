@@ -1,5 +1,5 @@
 import Anthropic from "@anthropic-ai/sdk";
-import type { AIProvider } from "./base.js";
+import type { AIProvider, ChatOptions } from "./base.js";
 import type {
   Message,
   StreamEvent,
@@ -30,6 +30,7 @@ export class AnthropicProvider implements AIProvider {
   async *chat(
     messages: Message[],
     tools?: ToolDefinition[],
+    options?: ChatOptions,
   ): AsyncIterable<StreamEvent> {
     const systemMsg = messages.find((m) => m.role === "system");
     const nonSystemMessages = messages
@@ -44,7 +45,7 @@ export class AnthropicProvider implements AIProvider {
 
     const stream = this.client.messages.stream({
       model: this.model,
-      max_tokens: this.config.MAX_TOKENS ?? 8192,
+      max_tokens: options?.maxTokensOverride ?? this.config.MAX_TOKENS ?? 8192,
       system: systemMsg?.content || "",
       messages: nonSystemMessages,
       tools: anthropicTools?.length ? anthropicTools : undefined,

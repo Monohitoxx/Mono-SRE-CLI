@@ -1,5 +1,5 @@
 import OpenAI from "openai";
-import type { AIProvider } from "./base.js";
+import type { AIProvider, ChatOptions } from "./base.js";
 import type {
   Message,
   StreamEvent,
@@ -58,6 +58,7 @@ export class OpenAIProvider implements AIProvider {
   async *chat(
     messages: Message[],
     tools?: ToolDefinition[],
+    options?: ChatOptions,
   ): AsyncIterable<StreamEvent> {
     const openaiMessages = messages.map((m) => this.toOpenAIMessage(m));
 
@@ -92,8 +93,8 @@ export class OpenAIProvider implements AIProvider {
         temperature: this.config.TEMPERATURE,
       }),
       ...(this.config.TOP_P !== undefined && { top_p: this.config.TOP_P }),
-      ...(this.config.MAX_TOKENS !== undefined && {
-        max_tokens: this.config.MAX_TOKENS,
+      ...(( options?.maxTokensOverride ?? this.config.MAX_TOKENS) !== undefined && {
+        max_tokens: options?.maxTokensOverride ?? this.config.MAX_TOKENS,
       }),
       ...(this.config.FREQUENCY_PENALTY !== undefined && {
         frequency_penalty: this.config.FREQUENCY_PENALTY,
