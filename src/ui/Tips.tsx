@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { Box, Text } from "ink";
 
-const MONO_TIPS = [
+export const MONO_TIPS = [
   "Use /help to see all available commands",
   "Create SKILL.md files in .mono/skills/ to add custom workflows",
   "Configure allowed commands in .mono/settings.json",

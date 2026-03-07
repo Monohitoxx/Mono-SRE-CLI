@@ -1,5 +1,5 @@
 import type { SSHManager } from "../../utils/ssh-manager.js";
-import { resolveTargets, type HostEntry } from "../../config/inventory.js";
+import { resolveTargets, findHost, type HostEntry } from "../../config/inventory.js";
 import { isPermissionErrorText } from "../../core/command-policy-utils.js";
 
 export interface HostResult {
@@ -57,13 +57,49 @@ export class RemoteExecutor {
   /**
    * Ensure SSH connection to a host, return connectionId.
    * Reuses existing connections via SSHManager.
+   * If the host has a jumpHost configured, recursively connects through the jump chain.
    */
-  async ensureConnected(entry: HostEntry): Promise<string> {
+  async ensureConnected(entry: HostEntry, _visited?: Set<string>): Promise<string> {
     const { host } = entry;
     const connectionId = `${host.username || "root"}@${host.ip}:${host.port || 22}`;
 
     if (this.sshManager.isConnected(connectionId)) {
       return connectionId;
+    }
+
+    if (host.jumpHost) {
+      const visited = _visited ?? new Set<string>();
+      if (visited.has(entry.name)) {
+        throw new Error(
+          `Circular jump host reference detected: ${[...visited, entry.name].join(" → ")}`,
+        );
+      }
+      visited.add(entry.name);
+
+      const jumpEntry = findHost(host.jumpHost);
+      if (!jumpEntry) {
+        throw new Error(
+          `Jump host "${host.jumpHost}" not found in inventory. Add it with inventory_add first.`,
+        );
+      }
+
+      const jumpConnId = await this.ensureConnected(jumpEntry, visited);
+
+      const tunnel = await this.sshManager.createTunnel(
+        jumpConnId,
+        host.ip,
+        host.port || 22,
+      );
+
+      return this.sshManager.connect({
+        host: host.ip,
+        port: host.port || 22,
+        username: host.username || "root",
+        password: host.password,
+        privateKeyPath: host.privateKeyPath,
+        sock: tunnel,
+        jumpConnectionId: jumpConnId,
+      });
     }
 
     return this.sshManager.connect({

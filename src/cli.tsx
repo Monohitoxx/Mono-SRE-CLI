@@ -1,6 +1,7 @@
 import React from "react";
 import { render } from "ink";
 import meow from "meow";
+import chalk from "chalk";
 import { App } from "./app.js";
 import { loadEnvConfig } from "./config/env.js";
 import { loadSettings, checkCommand } from "./config/settings.js";
@@ -10,6 +11,8 @@ import { createDefaultRegistry } from "./tools/registry.js";
 import { Agent } from "./core/agent.js";
 import { SSHManager } from "./utils/ssh-manager.js";
 import { AuditLogger } from "./utils/audit.js";
+import { pickLogo } from "./ui/AsciiArt.js";
+import { MONO_TIPS } from "./ui/Tips.js";
 import {
   ExecuteCommandTool,
   ReadConfigTool,
@@ -81,6 +84,36 @@ const cli = meow(
     },
   },
 );
+
+function printHeader(provider: string, model: string, version = "0.1.0"): void {
+  const columns = process.stdout.columns ?? 80;
+  const logo = pickLogo(columns);
+
+  const logoLines = logo
+    .split("\n")
+    .filter((l) => l.trim())
+    .map((line) => " " + chalk.cyan.bold(line))
+    .join("\n");
+  process.stdout.write("\n" + logoLines + "\n\n");
+
+  const innerWidth = Math.max(20, Math.min(columns - 4, 60));
+  const top = " ╭" + "─".repeat(innerWidth) + "╮";
+  const bot = " ╰" + "─".repeat(innerWidth) + "╯";
+  const infoText = ` │ ${chalk.cyan.bold("Mono")}  ${chalk.dim(`v${version}`)}  ${chalk.dim("|")}  ${chalk.white(provider + "/")}${chalk.white.bold(model)}`;
+  process.stdout.write(chalk.cyan(top) + "\n");
+  process.stdout.write(infoText + "\n");
+  process.stdout.write(chalk.cyan(bot) + "\n");
+
+  const tip = MONO_TIPS[Math.floor(Math.random() * MONO_TIPS.length)];
+  process.stdout.write("\n");
+  process.stdout.write(chalk.gray("  Tips for getting started:\n"));
+  process.stdout.write(chalk.gray("  1. ") + chalk.white("/help") + chalk.gray(" for available commands\n"));
+  process.stdout.write(chalk.gray("  2. Ask DevOps questions, manage servers, or troubleshoot issues\n"));
+  process.stdout.write(chalk.gray("  3. Be specific for the best results\n"));
+  process.stdout.write("\n");
+  process.stdout.write(chalk.yellow.dim("  💡 " + tip!) + "\n");
+  process.stdout.write("\n");
+}
 
 async function main() {
   const envConfig = loadEnvConfig();
@@ -177,6 +210,9 @@ async function main() {
     pendingSave.conv = conv;
     pendingSave.chat = chat;
   };
+
+  // Print header to stdout BEFORE Ink starts — avoids <Static> resize duplication
+  printHeader(envConfig.PROVIDER, envConfig.MODEL);
 
   const { waitUntilExit } = render(
     <App
