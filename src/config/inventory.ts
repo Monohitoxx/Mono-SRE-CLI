@@ -13,6 +13,7 @@ export interface Host {
   role?: string;
   services: string[];
   tags: string[];
+  jumpHost?: string;
 }
 
 export interface Inventory {

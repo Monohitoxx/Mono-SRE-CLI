@@ -8,6 +8,7 @@ export interface SSHConnection {
   password?: string;
   client: Client;
   connectedAt: Date;
+  jumpConnectionId?: string;
 }
 
 export type SudoGuard = (connectionId: string, command: string) => Promise<boolean>;
@@ -16,6 +17,7 @@ const SUDO_TOKEN_RE = /(^|[\s;&|()])sudo(?=\s|$)/;
 
 export class SSHManager {
   private connections = new Map<string, SSHConnection>();
+  private tunnelDependents = new Map<string, Set<string>>();
   private timeoutMs = 30000;
   private sudoGuard?: SudoGuard;
   private sudoGuardBypassed = false;
@@ -49,6 +51,8 @@ export class SSHManager {
     password?: string;
     privateKeyPath?: string;
     privateKey?: string;
+    sock?: NodeJS.ReadableStream;
+    jumpConnectionId?: string;
   }): Promise<string> {
     const id = `${opts.username}@${opts.host}:${opts.port || 22}`;
 
@@ -64,6 +68,10 @@ export class SSHManager {
       username: opts.username,
       readyTimeout: this.timeoutMs,
     };
+
+    if (opts.sock) {
+      (connectConfig as Record<string, unknown>).sock = opts.sock;
+    }
 
     if (opts.password) {
       connectConfig.password = opts.password;
@@ -101,8 +109,22 @@ export class SSHManager {
             password: opts.password,
             client,
             connectedAt: new Date(),
+            jumpConnectionId: opts.jumpConnectionId,
           });
-          this.audit?.log("ssh_connect", { connectionId: id, host: opts.host, username: opts.username });
+
+          if (opts.jumpConnectionId) {
+            if (!this.tunnelDependents.has(opts.jumpConnectionId)) {
+              this.tunnelDependents.set(opts.jumpConnectionId, new Set());
+            }
+            this.tunnelDependents.get(opts.jumpConnectionId)!.add(id);
+          }
+
+          this.audit?.log("ssh_connect", {
+            connectionId: id,
+            host: opts.host,
+            username: opts.username,
+            ...(opts.jumpConnectionId ? { jumpHost: opts.jumpConnectionId } : {}),
+          });
           resolve(id);
         })
         .on("error", (err) => {
@@ -240,9 +262,56 @@ export class SSHManager {
     });
   }
 
+  async createTunnel(
+    jumpConnectionId: string,
+    targetHost: string,
+    targetPort: number,
+  ): Promise<NodeJS.ReadableStream> {
+    const jumpConn = this.connections.get(jumpConnectionId);
+    if (!jumpConn) {
+      throw new Error(`Jump host connection not found: ${jumpConnectionId}`);
+    }
+
+    return new Promise((resolve, reject) => {
+      jumpConn.client.forwardOut(
+        "127.0.0.1",
+        0,
+        targetHost,
+        targetPort,
+        (err, channel) => {
+          if (err) {
+            reject(new Error(`Tunnel creation failed via ${jumpConnectionId}: ${err.message}`));
+            return;
+          }
+          resolve(channel as unknown as NodeJS.ReadableStream);
+        },
+      );
+    });
+  }
+
   disconnect(connectionId: string): boolean {
     const conn = this.connections.get(connectionId);
     if (!conn) return false;
+
+    // Cascade: disconnect all targets that depend on this connection
+    const dependents = this.tunnelDependents.get(connectionId);
+    if (dependents) {
+      for (const depId of [...dependents]) {
+        this.disconnect(depId);
+      }
+      this.tunnelDependents.delete(connectionId);
+    }
+
+    // Remove self from parent jump host's dependents
+    if (conn.jumpConnectionId) {
+      const parentDeps = this.tunnelDependents.get(conn.jumpConnectionId);
+      if (parentDeps) {
+        parentDeps.delete(connectionId);
+        if (parentDeps.size === 0) {
+          this.tunnelDependents.delete(conn.jumpConnectionId);
+        }
+      }
+    }
 
     conn.client.end();
     this.connections.delete(connectionId);

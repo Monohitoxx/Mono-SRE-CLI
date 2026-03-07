@@ -55,6 +55,11 @@ If a host with the same name already exists, it will be updated with the new det
         description:
           'Known services running on this host (e.g. ["nginx", "docker", "redis"])',
       },
+      jump_host: {
+        type: "string",
+        description:
+          'Name of a jump host (bastion) in inventory to connect through. The jump host must already exist in inventory. Example: "bastion01"',
+      },
     },
     required: ["name", "ip", "username"],
   };
@@ -93,6 +98,7 @@ If a host with the same name already exists, it will be updated with the new det
       services: Array.isArray(args.services)
         ? (args.services as string[])
         : [],
+      jumpHost: typeof args.jump_host === "string" ? args.jump_host : undefined,
     };
 
     const result = addHost(name, host);
