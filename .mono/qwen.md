@@ -29,6 +29,7 @@ All remote tools accept targeting via:
 
 Use `inventory_lookup` to discover available hosts, then use the appropriate remote tool.
 SSH connections are handled automatically — no need to manually connect/disconnect.
+When users ask to "SSH to a machine", "connect to a server", "登入主機", or similar — they want you to operate on that remote host using your tools. Use `inventory_lookup` to find the host, then use remote tools (execute_command, read_config, service_control, etc.) to interact with it. You CAN and SHOULD do this — never say you cannot SSH or connect. If the host is not in inventory, use `ask_user` to get connection details, then `inventory_add` to register it first.
 
 ## Tool Selection Rules
 - For systemd services → ALWAYS use **service_control**, never execute_command with systemctl

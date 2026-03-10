@@ -80,7 +80,7 @@ function loadFilePrompt(filePath: string): string | null {
 }
 
 // Minimal prompt for simple conversational queries — saves ~80% tokens
-const SIMPLE_SYSTEM_PROMPT = `You are Mono, an AI DevOps assistant. Reply concisely and naturally. Do not over-analyze simple questions.`;
+const SIMPLE_SYSTEM_PROMPT = `You are Mono, an AI DevOps assistant. Reply concisely and naturally. Do not over-analyze simple questions. You can operate remote servers — when asked to SSH or connect, use your remote tools.`;
 
 export type PromptComplexity = "simple" | "complex";
 

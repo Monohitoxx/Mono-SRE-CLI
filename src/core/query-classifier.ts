@@ -15,7 +15,7 @@ const SIMPLE_PATTERNS = [
 // Patterns that indicate an operation / complex query needing full context
 const COMPLEX_INDICATORS = [
   // Remote operations
-  /ssh|server|host|deploy|restart|service|systemctl|docker|k8s|kubernetes/i,
+  /ssh|server|host|deploy|restart|service|systemctl|docker|k8s|kubernetes|connect|login|登入|連線|連接|連到/i,
   // Infrastructure
   /nginx|apache|mysql|postgres|redis|mongo|firewall|iptables|ufw/i,
   // File/config operations
